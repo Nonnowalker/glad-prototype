@@ -65,9 +65,11 @@ function cacheDOMElements() {
     keywordsAttualiList = document.getElementById('keywords-attuali-list');
     keywordsPermanentiList = document.getElementById('keywords-permanenti-list');
 
+    // Verifica elementi critici per l'UI base
     if (!chapterTextEl || !actionsEl || !characterSheetEl || !globalActionsContainer) {
          console.error("FATAL: Elementi UI principali non trovati nel DOM! Controlla index.html.");
-         document.body.innerHTML = "<h1>Errore: Interfaccia utente non caricata correttamente.</h1>";
+         // Potrebbe essere utile bloccare qui o mostrare un errore all'utente
+         // document.body.innerHTML = "<h1>Errore: Interfaccia utente non caricata correttamente.</h1>";
     } else {
         console.log("Elementi DOM Caching completato (da ui.js).");
     }
@@ -82,11 +84,15 @@ function cacheDOMElements() {
 function displayInitialStateUI() {
     if (!chapterTextEl || !chapterTitleEl || !actionsEl || !globalActionsContainer) { console.error("displayInitialStateUI: Elementi UI principali non trovati/caricati!"); return; }
 
+    // Mostra testo capitolo 0 o messaggio di default
+    // Verifica che gameData e getString siano disponibili
     if (typeof gameData !== 'undefined' && typeof getString === 'function' && gameData["0"]) {
          const introChapter = gameData["0"];
          chapterTextEl.innerHTML = introChapter.text ? introChapter.text.replace(/\n/g, '<br>') : getString('loadingText');
          chapterTitleEl.textContent = introChapter.title || '';
-         if (introChapter.images && introChapter.images.length > 0 && imageContainer) imageContainer.classList.add('hidden');
+         if (introChapter.images && introChapter.images.length > 0 && imageContainer) {
+             imageContainer.classList.add('hidden');
+         }
     } else {
          chapterTextEl.innerHTML = (typeof getString === 'function') ? getString('loadingText') : 'Loading...';
          chapterTitleEl.textContent = '';
@@ -99,78 +105,46 @@ function displayInitialStateUI() {
     if(diceRollEl) diceRollEl.classList.add('hidden');
     if(imageContainer) imageContainer.classList.add('hidden');
     if(gameOverOverlay) gameOverOverlay.classList.add('hidden');
-    updateCharacterSheetUI();
+
+    updateCharacterSheetUI(); // Aggiorna per mostrare vuoto/default
     if(globalActionsContainer) globalActionsContainer.querySelectorAll('button').forEach(b => b.disabled = false);
 }
 
 /**
- * Prepara e mostra l'interfaccia per la configurazione iniziale del personaggio (Fase 1: Spesa PE).
- * Chiamata da resetGameAndUpdateUI (in main.js).
+ * Prepara la UI per la schermata di spesa PE.
  */
-function showInitScreen() {
-    // Verifica esistenza funzioni/stato base necessari
-     if (typeof initialGameState === 'undefined' || typeof gameState === 'undefined' || typeof JSON === 'undefined' || typeof updateAllUIStrings !== 'function' || typeof displayInitialStateUI !== 'function' || typeof setupPESpendingUI !== 'function') {
-         console.error("Errore critico: Dipendenze mancanti per showInitScreen!");
-         if(chapterTextEl) chapterTextEl.textContent = getString('errorGeneric') || "Errore";
-         return;
+function setupPESpendingUI() {
+     if (!peSpendingOptionsEl || !initialItemsOptionsEl || !chapterTitleEl || !chapterTextEl || !confirmPEButton) { console.error("Errore: Elementi UI per spesa PE mancanti!"); return; }
+     peSpendingOptionsEl.classList.remove('hidden');
+     initialItemsOptionsEl.classList.add('hidden');
+     // if(initOptionsEl) initOptionsEl.classList.remove('hidden'); // Rimuovi se initOptionsEl non è più usato come contenitore separato
+
+     chapterTitleEl.textContent = getString('configTitlePE');
+     chapterTextEl.innerHTML = '';
+
+     if(peLanguageSelectionEl) {
+         peLanguageSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.disabled = false; });
      }
-
-    console.log("showInitScreen: Avvio configurazione personaggio...");
-    // Resetta stato temporaneo per spesa PE (variabili definite in state.js)
-    tempStats = JSON.parse(JSON.stringify(initialGameState.stats)); // Copia stats base
-    tempLang = null;
-    peSpent = { total: 0, combattivita: 0, resistenza: 0, mira: 0, movimento: 0, sotterfugio: 0, scassinare: 0, percezione: 0, conoscenzaArcana: 0, lingua: 0 };
-
-    // Mostra la UI corretta (nasconde gioco/altre init, mostra spesa PE)
-    // displayInitialStateUI(); // NON chiamare questo qui, resetterebbe troppo
-
-    // Nascondi elementi non pertinenti e mostra quelli per PE
-    if(actionsEl) actionsEl.innerHTML = ''; // Pulisce azioni capitolo
-    if(initialItemsOptionsEl) initialItemsOptionsEl.classList.add('hidden'); // Nasconde scelta oggetti
-    if(combatInfoEl) combatInfoEl.classList.add('hidden');
-    if(diceRollEl) diceRollEl.classList.add('hidden');
-    if(imageContainer) imageContainer.classList.add('hidden');
-    if(gameOverOverlay) gameOverOverlay.classList.add('hidden');
-    if(peSpendingOptionsEl) peSpendingOptionsEl.classList.remove('hidden'); // Mostra sezione PE
-    if(initOptionsEl) initOptionsEl.classList.remove('hidden'); // Mostra container genitore se usato
-
-
-    // Imposta titolo e pulisce testo capitolo
-    if(chapterTitleEl) chapterTitleEl.textContent = getString('configTitlePE'); else console.error("Elemento chapterTitleEl non trovato!");
-    if(chapterTextEl) chapterTextEl.innerHTML = '';
-
-    // Resetta Checkbox Lingue
-    if(peLanguageSelectionEl) {
-        peLanguageSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.disabled = false; });
-    }
-
-    // Aggiorna la UI della spesa PE e le label
-    updatePESpendingUI(); // Aggiorna valori e stato bottoni PE
-    updateLanguageSelectionLabels(); // Aggiorna testi label lingue
-    updateAllUIStrings(); // Aggiorna tutti gli altri testi statici (inclusi titoli sezioni PE)
-
-    // L'handler per confirmPEButton è associato in main.js
-
-    announceMessage(getString('infoConfigStart'));
-    if(chapterTitleContainer) chapterTitleContainer.focus(); else console.warn("chapterTitleContainer non trovato per focus.");
+     updatePESpendingUI();
+     updateLanguageSelectionLabels();
 }
-
 
 /**
  * Prepara la UI per la schermata di scelta oggetti iniziali.
  */
 function setupInitialItemsUI() {
-    if (!peSpendingOptionsEl || !initialItemsOptionsEl || !chapterTitleEl || !initItemsSelectionEl || !startGameButton) { console.error("Errore UI Oggetti mancanti!"); return; }
+    if (!peSpendingOptionsEl || !initialItemsOptionsEl || !chapterTitleEl || !initItemsSelectionEl || !startGameButton) { console.error("Errore: Elementi UI per scelta oggetti mancanti!"); return; }
     peSpendingOptionsEl.classList.add('hidden');
     initialItemsOptionsEl.classList.remove('hidden');
-    if(initOptionsEl) initOptionsEl.classList.remove('hidden');
-    chapterTitleEl.textContent = getString('configItemsTitle');
+    // if(initOptionsEl) initOptionsEl.classList.remove('hidden');
+
+    chapterTitleEl.textContent = getString('configTitleItems'); // Usa chiave corretta
+
     if(initItemsSelectionEl) {
          initItemsSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.disabled = false; });
-          handleInitialItemChange(); // Aggiorna stato bottone Start
+          handleInitialItemChange();
     }
-     updateInitialItemLabels(); // Assicura che le label siano tradotte
-     // L'handler per startGameButton è in main.js
+     updateInitialItemLabels();
 }
 
 
@@ -179,16 +153,43 @@ function setupInitialItemsUI() {
  * Legge dalle variabili globali tempStats e peSpent (da state.js).
  */
 function updatePESpendingUI() {
-    // Verifica esistenza elementi e stato prima di aggiornare
     if (!peRemainingEl || !confirmPEButton || typeof initialGameState === 'undefined' || !initialGameState.stats || typeof peSpent === 'undefined' || typeof tempStats === 'undefined') { return; }
     const peLeft = initialGameState.stats.puntiEsperienza - peSpent.total;
     peRemainingEl.textContent = peLeft;
-    for (const statKey in tempStats) { /* ... aggiorna stats temp e PE spesi ... */ } // Come prima
-    const peSpentLangEl = document.getElementById('pe-spent-lingua'); if(peSpentLangEl) peSpentLangEl.textContent = peSpent.lingua !== undefined ? peSpent.lingua : 0;
+
+    for (const statKey in tempStats) {
+        if (!tempStats.hasOwnProperty(statKey) || tempStats[statKey] === undefined) continue;
+        const statEl = document.getElementById(`temp-stat-${statKey}`);
+        if (statEl) statEl.textContent = tempStats[statKey];
+        const peSpentEl = document.getElementById(`pe-spent-${statKey}`);
+        if (peSpentEl) peSpentEl.textContent = peSpent[statKey] !== undefined ? peSpent[statKey] : 0;
+    }
+    const peSpentLangEl = document.getElementById('pe-spent-lingua');
+    if(peSpentLangEl) peSpentLangEl.textContent = peSpent.lingua !== undefined ? peSpent.lingua : 0;
+
     const baseStats = initialGameState.stats;
-    document.querySelectorAll('.pe-stat-row').forEach(row => { /* ... logica abilita/disabilita +/- ... */ }); // Come prima
-    const canAffordLanguage = peLeft > 0;
-    if(peLanguageSelectionEl) { peLanguageSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.disabled = (peSpent.lingua >= 1 && !cb.checked) || (!canAffordLanguage && peSpent.lingua < 1); }); }
+    document.querySelectorAll('.pe-stat-row').forEach(row => {
+        const plusButton = row.querySelector('.pe-btn-plus');
+        const minusButton = row.querySelector('.pe-btn-minus');
+        if(!plusButton || !minusButton) return;
+        const statKey = plusButton.dataset.stat;
+        if (!statKey || !tempStats.hasOwnProperty(statKey) || peSpent[statKey] === undefined) return;
+
+        const currentValue = tempStats[statKey];
+        const currentPeSpentOnThis = peSpent[statKey] || 0;
+        const maxPESpentOnStat = 1;
+        const canAffordMorePE = peLeft > 0;
+
+        let canIncrement = canAffordMorePE && currentPeSpentOnThis < maxPESpentOnStat;
+        if (statKey === 'resistenza' && currentValue >= baseStats.resistenza + 3) canIncrement = false;
+        if (statKey !== 'resistenza' && currentValue >= baseStats[statKey] + 1) canIncrement = false;
+        plusButton.disabled = !canIncrement;
+
+        minusButton.disabled = currentPeSpentOnThis <= 0;
+    });
+
+     const canAffordLanguage = peLeft > 0;
+     if(peLanguageSelectionEl) { peLanguageSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.disabled = (peSpent.lingua >= 1 && !cb.checked) || (!canAffordLanguage && peSpent.lingua < 1); }); }
     confirmPEButton.disabled = peSpent.total !== initialGameState.stats.puntiEsperienza;
 }
 
@@ -197,10 +198,34 @@ function updatePESpendingUI() {
  * Legge i dati dalla variabile globale gameState (definita in state.js).
  */
 function updateCharacterSheetUI() {
-    // ... (Logica updateCharacterSheetUI completa come nella risposta precedente) ...
-     const stats = gameState && gameState.stats ? gameState.stats : { /*...*/ };
-     const inventory = gameState && gameState.inventory ? gameState.inventory : { /*...*/ };
-     // ... (Aggiorna tutti gli elementi della scheda con controlli if(elemento)... ) ...
+    const stats = gameState && gameState.stats ? gameState.stats : { combattivita: 0, resistenza: 0, resistenzaMax: 0, mira: 0, movimento: 0, sotterfugio: 0, scassinare: 0, percezione: 0, conoscenzaArcana: 0 };
+    const inventory = gameState && gameState.inventory ? gameState.inventory : { armi: [], indossati: [], zaino: [], hasZaino: false };
+    const languages = gameState && gameState.lingue ? gameState.lingue : [];
+    const gold = gameState && gameState.moneteOro !== undefined ? gameState.moneteOro : 0;
+    const keywords = gameState && gameState.keywords ? gameState.keywords : { attuali: [], permanenti: [] };
+
+    // Aggiorna elementi DOM (con controlli esistenza per robustezza)
+    if (statCombattivita) statCombattivita.textContent = stats.combattivita;
+    if (statResistenza) statResistenza.textContent = Math.max(0, stats.resistenza);
+    if (statResistenzaMax) statResistenzaMax.textContent = stats.resistenzaMax;
+    if (statMira) statMira.textContent = stats.mira;
+    if (statMovimento) statMovimento.textContent = stats.movimento;
+    if (statSotterfugio) statSotterfugio.textContent = stats.sotterfugio;
+    if (statScassinare) statScassinare.textContent = stats.scassinare;
+    if (statPercezione) statPercezione.textContent = stats.percezione;
+    if (statConoscenzaArcana) statConoscenzaArcana.textContent = stats.conoscenzaArcana;
+    if (lingueList) lingueList.innerHTML = languages.map(l => `<li>${l}</li>`).join('');
+    if (moneteOro) moneteOro.textContent = gold;
+    if (hasZaino) hasZaino.checked = inventory.hasZaino;
+    if (zainoCount) zainoCount.textContent = inventory.zaino ? inventory.zaino.length : 0;
+    if (armiList) armiList.innerHTML = inventory.armi.map(i => `<li>${i.split('/')[0]}</li>`).join('');
+    if (indossatiList) indossatiList.innerHTML = inventory.indossati.map(i => `<li>${i.split('/')[0]}</li>`).join('');
+    if (zainoList) zainoList.innerHTML = inventory.zaino.map(i => `<li>${i.split('/')[0]}</li>`).join('');
+    if (keywordsAttualiList) keywordsAttualiList.innerHTML = keywords.attuali.map(k => `<li>${k}</li>`).join('');
+    if (keywordsPermanentiList) keywordsPermanentiList.innerHTML = keywords.permanenti.map(k => `<li>${k}</li>`).join('');
+
+     if(characterSheetEl) characterSheetEl.setAttribute('aria-live', 'off');
+     setTimeout(() => { if(characterSheetEl) characterSheetEl.setAttribute('aria-live', 'polite'); }, 50);
 }
 
 
@@ -209,12 +234,17 @@ function updateCharacterSheetUI() {
  * Legge i dati da gameState.combat.
  */
 function updateCombatUI() {
-    // ... (Logica updateCombatUI completa come nella risposta precedente) ...
     if (!gameState.combat || !combatInfoEl || !combatEnemiesEl || !combatLogEl || !actionsEl) { if(combatInfoEl) combatInfoEl.classList.add('hidden'); return; }
-    combatInfoEl.classList.remove('hidden'); actionsEl.innerHTML = ''; if(diceRollEl) diceRollEl.classList.add('hidden');
-    combatEnemiesEl.innerHTML = ''; if (Array.isArray(gameState.combat.enemies)) { gameState.combat.enemies.forEach(enemy => { combatEnemiesEl.innerHTML += `<li>...</li>`; }); }
+    combatInfoEl.classList.remove('hidden');
+    actionsEl.innerHTML = '';
+    if(diceRollEl) diceRollEl.classList.add('hidden');
+    combatEnemiesEl.innerHTML = '';
+    if (Array.isArray(gameState.combat.enemies)) { gameState.combat.enemies.forEach(enemy => { combatEnemiesEl.innerHTML += `<li>${enemy.name} (C: ${enemy.C}, R: ${Math.max(0, enemy.R)}/${enemy.initialR || enemy.R})</li>`; }); }
     combatLogEl.innerHTML = ''; combatLog.forEach(msg => { combatLogEl.innerHTML += `<p>${msg}</p>`; }); scrollToCombatLogBottom();
-    if (gameState.combat.turn === 'player') { /* ... crea bottoni Attacca/Fuga ... */ } else { actionsEl.innerHTML = `<p><i>${getString('enemyTurnLabel')}</i></p>`; }
+    if (gameState.combat.turn === 'player') {
+        const attackButton = document.createElement('button'); attackButton.textContent = getString('attackButtonLabel'); attackButton.id = "combat-attack-button"; actionsEl.appendChild(attackButton);
+        const fleeButton = document.createElement('button'); fleeButton.textContent = getString('fleeButtonLabel'); fleeButton.disabled = true; fleeButton.id = "combat-flee-button"; actionsEl.appendChild(fleeButton);
+    } else { actionsEl.innerHTML = `<p><i>${getString('enemyTurnLabel')}</i></p>`; }
 }
 
 /**
@@ -222,7 +252,6 @@ function updateCombatUI() {
  * @param {object} skillCheckData - L'oggetto gameState.skillCheck.
  */
 function updateSkillCheckUI(skillCheckData) {
-    // ... (Logica updateSkillCheckUI completa come nella risposta precedente) ...
     if (!skillCheckData || !diceRollEl || !skillCheckPromptEl || !diceResultEl || !rollDiceButton || !actionsEl) { console.error("Errore UI Skill Check mancanti!"); if(diceRollEl) diceRollEl.classList.add('hidden'); return; }
     skillCheckPromptEl.textContent = getString('skillCheckRollPrompt', { skillName: skillCheckData.skill, targetValue: skillCheckData.target });
     diceResultEl.textContent = ``; rollDiceButton.disabled = false;
@@ -234,8 +263,9 @@ function updateSkillCheckUI(skillCheckData) {
  * @param {string} message - Il messaggio da aggiungere.
  */
 function addLogToUI(message) {
-    // ... (Logica addLogToUI completa come nella risposta precedente) ...
-    if (combatLogEl && combatInfoEl && !combatInfoEl.classList.contains('hidden')) { /* ... aggiunge <p> e scrolla ... */ }
+    if (combatLogEl && combatInfoEl && !combatInfoEl.classList.contains('hidden')) {
+        const logP = document.createElement('p'); logP.textContent = message; combatLogEl.appendChild(logP); scrollToCombatLogBottom();
+    }
 }
 
 /**
@@ -245,18 +275,18 @@ function scrollToCombatLogBottom() { if (combatLogEl) combatLogEl.scrollTop = co
 
 /**
  * Mostra la schermata di Game Over (overlay).
- * @param {string} reasonKey - La chiave della stringa per il motivo del game over.
- * @param {object} [params={}] - Parametri opzionali per la stringa del motivo.
+ * @param {string} reasonKey - La chiave della stringa per il motivo.
+ * @param {object} [params={}] - Parametri opzionali per la stringa.
  */
 function showGameOverUI(reasonKey, params = {}) {
-    // ... (Logica showGameOverUI completa come nella risposta precedente) ...
     if (!gameOverOverlay || !gameOverReasonEl) { console.error("Elementi UI Game Over mancanti!"); alert(`${getString('gameOverTitle')}: ${getString(reasonKey, params) || getString('infoGameOverReason')}`); return; }
-    gameOverOverlay.classList.remove('hidden'); gameOverReasonEl.textContent = getString(reasonKey, params) || getString('infoGameOverReason'); updateGameOverUI();
+    gameOverOverlay.classList.remove('hidden');
+    gameOverReasonEl.textContent = getString(reasonKey, params) || getString('infoGameOverReason');
+    updateGameOverUI(); // Aggiorna titolo/bottone overlay
 }
 
 /**
- * Gestisce l'aggiornamento dell'abilitazione/disabilitazione dei checkbox
- * durante la selezione degli oggetti iniziali. (Logica UI)
+ * Gestisce l'aggiornamento dell'abilitazione/disabilitazione dei checkbox oggetti iniziali.
  */
 function handleInitialItemChange() {
     if (!initItemsSelectionEl || !startGameButton) return;
@@ -270,50 +300,65 @@ function handleInitialItemChange() {
 // --- Funzioni per aggiornare testi statici (Definite qui) ---
 
 /**
- * Aggiorna tutte le stringhe statiche nell'interfaccia che usano l'attributo data-string-key.
+ * Aggiorna tutte le stringhe statiche con data-string-key.
  */
 function updateAllUIStrings() {
-    // ... (Logica updateAllUIStrings completa come nella risposta precedente) ...
-     console.log("Updating all UI strings for language:", currentLang);
-     document.querySelectorAll('[data-string-key]').forEach(element => { /* ... aggiorna elementi ... */ });
-     document.title = getString('gameTitle'); const skipLink = document.getElementById('skip-link'); if(skipLink) skipLink.textContent = getString('skipLinkText');
-     updateInitialItemLabels(); updateLanguageSelectionLabels();
-     if (gameOverOverlay && !gameOverOverlay.classList.contains('hidden')) { updateGameOverUI(); }
+    console.log("Updating all UI strings for language:", currentLang); // currentLang da strings.js
+    document.querySelectorAll('[data-string-key]').forEach(element => {
+        const key = element.dataset.stringKey;
+        // Salta elementi gestiti specificamente
+        if(element.closest('#initial-items-selection span') || element.closest('#pe-language-selection span')) return;
+        if(element.id === 'chapter-title') return;
+
+        const text = getString(key); // getString da strings.js
+
+        if (element.tagName === 'BUTTON' || (element.tagName === 'INPUT' && (element.type === 'button' || element.type === 'submit'))) { element.textContent = text; }
+        else if (element.tagName === 'SPAN' || element.tagName === 'P' || element.tagName === 'H1' || element.tagName === 'H2' || element.tagName === 'H3' || element.tagName === 'H4' || element.tagName === 'LEGEND' || element.tagName === 'A' || element.tagName === 'STRONG' || element.tagName === 'SMALL' || element.tagName === 'DIV' || element.tagName === 'LABEL') {
+             if (!element.children.length || Array.from(element.childNodes).every(node => node.nodeType === Node.TEXT_NODE)) { element.textContent = text; }
+             else if (element.tagName === 'LABEL' && !element.querySelector('span[data-string-key]')) { element.textContent = text; }
+        }
+    });
+    document.title = getString('gameTitle');
+    const skipLink = document.getElementById('skip-link'); if(skipLink) skipLink.textContent = getString('skipLinkText');
+    updateInitialItemLabels(); updateLanguageSelectionLabels();
+    if (gameOverOverlay && !gameOverOverlay.classList.contains('hidden')) { updateGameOverUI(); }
 }
 
 /**
- * Aggiorna specificamente le label degli oggetti nella schermata di configurazione iniziale.
+ * Aggiorna le label degli oggetti nella schermata init.
  */
 function updateInitialItemLabels() {
-    // ... (Logica updateInitialItemLabels completa come nella risposta precedente) ...
-     if (!initItemsSelectionEl) return;
-      initItemsSelectionEl.querySelectorAll('label').forEach(label => { /* ... aggiorna span interni ... */ });
-      const itemsTitle = initialItemsOptionsEl?.querySelector('h3[data-string-key="configItemsTitle"]'); if(itemsTitle) itemsTitle.textContent = getString('configItemsTitle');
-      // ... aggiorna legend, label, note ...
+    if (!initItemsSelectionEl) return;
+     initItemsSelectionEl.querySelectorAll('label').forEach(label => {
+         const span = label.querySelector('span[data-string-key]'); if (span && span.dataset.stringKey) { span.textContent = getString(span.dataset.stringKey); }
+     });
+     const itemsTitle = initialItemsOptionsEl?.querySelector('h3[data-string-key="configItemsTitle"]'); if(itemsTitle) itemsTitle.textContent = getString('configItemsTitle');
+     const itemsLegend = initialItemsOptionsEl?.querySelector('legend[data-string-key="configItemsLegend"]'); if(itemsLegend) itemsLegend.textContent = getString('configItemsLegend');
+     const itemsLabel = initialItemsOptionsEl?.querySelector('p[data-string-key="configItemsLabel"]'); if(itemsLabel) itemsLabel.textContent = getString('configItemsLabel');
+     const itemsNote = initialItemsOptionsEl?.querySelector('small[data-string-key="configItemsNote"]'); if(itemsNote) itemsNote.textContent = getString('configItemsNote');
  }
 
 /**
- * Aggiorna specificamente le label delle lingue nella schermata di spesa PE.
+ * Aggiorna le label delle lingue nella schermata PE.
  */
 function updateLanguageSelectionLabels() {
-    // ... (Logica updateLanguageSelectionLabels completa come nella risposta precedente) ...
-     if (!peLanguageSelectionEl) return;
-      peLanguageSelectionEl.querySelectorAll('label').forEach(label => { /* ... aggiorna span interni ... */ });
-      // ... aggiorna titoli sezioni PE ...
+    if (!peLanguageSelectionEl) return;
+     peLanguageSelectionEl.querySelectorAll('label').forEach(label => {
+         const span = label.querySelector('span[data-string-key]'); if (span && span.dataset.stringKey) { span.textContent = getString(span.dataset.stringKey); }
+     });
+     const langTitle = peSpendingOptionsEl?.querySelector('h4[data-string-key="additionalLanguageLabel"]'); if (langTitle) langTitle.textContent = getString('additionalLanguageLabel');
+     const combatAbilitiesTitle = peSpendingOptionsEl?.querySelector('h4[data-string-key="combatAbilitiesLabel"]'); if (combatAbilitiesTitle) combatAbilitiesTitle.textContent = getString('combatAbilitiesLabel');
+     const genericAbilitiesTitle = peSpendingOptionsEl?.querySelector('h4[data-string-key="genericAbilitiesLabel"]'); if (genericAbilitiesTitle) genericAbilitiesTitle.textContent = getString('genericAbilitiesLabel');
  }
 
  /**
  * Aggiorna i testi statici della schermata di Game Over.
  */
  function updateGameOverUI() {
-    // ... (Logica updateGameOverUI completa come nella risposta precedente) ...
-     if (!gameOverOverlay) return;
-     const title = gameOverOverlay.querySelector('h2[data-string-key="gameOverTitle"]'); if (title) title.textContent = getString('gameOverTitle');
-     const button = gameOverOverlay.querySelector('button[data-string-key="gameOverReloadButton"]'); if (button) button.textContent = getString('gameOverReloadButton');
+    if (!gameOverOverlay) return;
+    const title = gameOverOverlay.querySelector('h2[data-string-key="gameOverTitle"]'); if (title) title.textContent = getString('gameOverTitle');
+    const button = gameOverOverlay.querySelector('button[data-string-key="gameOverReloadButton"]'); if (button) button.textContent = getString('gameOverReloadButton');
  }
-
-
-// Non esporta nulla con window. Le funzioni saranno chiamate da main.js o engine.js
 
 // --- Fine ui.js ---
 console.log("ui.js: Script analizzato.");
