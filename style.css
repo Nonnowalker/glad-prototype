@@ -1,0 +1,401 @@
+/* CSS Essenziale e Funzionale + Accessibilità Base */
+body {
+    font-family: sans-serif; /* Usa un font sans-serif leggibile di default */
+    line-height: 1.6; /* Spaziatura interlinea per leggibilità */
+    background-color: #f8f9fa; /* Sfondo leggermente grigio */
+    color: #212529; /* Testo scuro per contrasto */
+    margin: 0; /* Rimuove margini default */
+    display: flex; /* Usa flexbox per layout generale */
+    flex-direction: column;
+    min-height: 100vh; /* Assicura che il body copra almeno tutta l'altezza della viewport */
+}
+
+/* Skip Link Styling (Visibile solo on focus per accessibilità tastiera) */
+.skip-link {
+    position: absolute;
+    top: -40px; /* Posizionato fuori schermo di default */
+    left: 0;
+    background: #007bff; /* Colore sfondo evidente */
+    color: white; /* Testo bianco per contrasto */
+    padding: 8px 12px; /* Spaziatura interna */
+    z-index: 1000; /* Assicura sia sopra altri elementi */
+    text-decoration: none; /* Rimuove sottolineatura standard */
+    border-radius: 0 0 5px 0; /* Angoli smussati */
+    transition: top 0.2s ease-in-out; /* Transizione fluida per apparizione */
+}
+.skip-link:focus {
+    top: 0; /* Portato in vista quando riceve focus da tastiera */
+}
+
+/* Contenitori Principali */
+#container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Occupa spazio verticale disponibile */
+}
+#visuals { /* Contenitore per grafica 3D (se presente) */
+    position: fixed; /* Fisso sullo sfondo */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Dietro al contenuto */
+    overflow: hidden; /* Nasconde overflow grafica */
+    background-color: #e9ecef; /* Sfondo di fallback semplice */
+}
+#visuals canvas {
+    display: block; /* Previene spazio extra sotto il canvas */
+}
+
+
+#language-selector-container {
+    position: absolute; /* Posizionamento assoluto rispetto al contenitore più vicino posizionato (o body) */
+    top: 10px;          /* Distanza dal bordo superiore */
+    right: 10px;         /* Distanza dal bordo destro */
+    z-index: 10;         /* Assicura sia sopra altri elementi di gioco ma sotto eventuali overlay */
+    background: rgba(255, 255, 255, 0.85); /* Sfondo leggermente trasparente per leggibilità */
+    padding: 8px 10px;   /* Padding interno */
+    border-radius: 4px;  /* Angoli arrotondati */
+    border: 1px solid #dee2e6; /* Bordo leggero */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Ombra leggera */
+}
+
+#lang-select {
+    /* Stili opzionali per migliorare aspetto del dropdown */
+    padding: 4px 6px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+/* Stile per il separatore <hr> */
+hr.separator {
+    margin: 20px 0; /* Mantiene lo spazio verticale */
+    border: none; /* Rimuove bordo di default */
+    border-top: 1px solid #dee2e6; /* Usa un bordo superiore come linea */
+}
+
+
+#game-content { /* Area principale che contiene testo e scheda */
+    display: flex; /* Layout affiancato per area testo e scheda */
+    flex-wrap: wrap; /* Permette di andare a capo su schermi piccoli */
+    flex-grow: 1;
+    padding: 15px;
+    background-color: #ffffff; /* Sfondo bianco per contenuto */
+    margin: 15px auto; /* Centra orizzontalmente con margini verticali */
+    max-width: 1200px; /* Limita larghezza massima */
+    border: 1px solid #dee2e6; /* Bordo sottile */
+    position: relative; /* Necessario per z-index sopra #visuals */
+    z-index: 1;
+    border-radius: 4px; /* Angoli leggermente arrotondati */
+}
+
+/* Aree Interne a game-content */
+#main-text-area { /* Area testo, scelte, azioni */
+    flex: 3; /* Occupa più spazio orizzontale */
+    min-width: 300px; /* Larghezza minima prima di andare a capo */
+    padding-right: 15px; /* Spazio prima del separatore */
+    margin-bottom: 15px; /* Spazio sotto quando va a capo */
+}
+#character-sheet-container { /* Contenitore per la scheda personaggio */
+    flex: 1; /* Occupa meno spazio orizzontale */
+    min-width: 260px; /* Larghezza minima scheda */
+    padding-left: 15px; /* Spazio dopo il separatore */
+    border-left: 1px solid #dee2e6; /* Linea separatrice verticale */
+    max-height: 85vh; /* Limita altezza e attiva scroll */
+    overflow-y: auto; /* Scroll verticale se contenuto eccede */
+}
+
+/* Stili Responsive (per schermi piccoli) */
+@media (max-width: 768px) {
+    #game-content {
+        flex-direction: column; /* Impila le aree verticalmente */
+        margin: 10px;
+        padding: 10px;
+    }
+    #main-text-area {
+        padding-right: 0; /* Rimuove padding laterale */
+        margin-bottom: 10px;
+    }
+    #character-sheet-container {
+        padding-left: 0; /* Rimuove padding laterale */
+        border-left: none; /* Rimuove separatore verticale */
+        border-top: 1px solid #dee2e6; /* Aggiunge separatore orizzontale */
+        padding-top: 10px; /* Spazio sopra la scheda */
+        max-height: none; /* Rimuove limite altezza */
+        overflow-y: visible; /* Disattiva scroll dedicato */
+    }
+}
+
+/* Tipografia e Struttura Testo */
+h1, h2, h3, h4 {
+    margin-top: 0;
+    margin-bottom: 0.75em; /* Spazio sotto i titoli */
+    font-weight: 600; /* Semi-bold */
+    color: #343a40; /* Colore scuro per titoli */
+}
+h1 { font-size: 1.6em; text-align: center;}
+h2 { font-size: 1.3em; border-bottom: 1px solid #dee2e6; padding-bottom: 3px;}
+h3 { font-size: 1.1em; }
+h4 { font-size: 1em; margin-bottom: 0.5em;} /* Titoli più piccoli (es. scheda) */
+
+#chapter-image-container {
+    margin-bottom: 1em;
+    text-align: center;
+}
+#chapter-image-container img {
+    max-width: 100%;
+    height: auto;
+    max-height: 350px; /* Leggermente più alta */
+    border: 1px solid #f1f1f1; /* Bordo molto leggero */
+    display: block; /* Centra se text-align center */
+    margin: 0 auto; /* Centra l'immagine */
+}
+
+#chapter-text {
+    margin-bottom: 15px;
+    white-space: pre-line; /* Rispetta a capo nel testo */
+    min-height: 50px; /* Altezza minima per evitare "salti" layout */
+}
+#chapter-text strong { /* Evidenziazione nel testo (es. oggetti) */
+    font-weight: bold;
+    color: #495057;
+}
+.chapter-instruction { /* Testo aggiunto da JS (es. perdita/guadagno R) */
+     font-style: italic;
+     color: #6c757d; /* Grigio */
+     display: block; /* Va a capo */
+     margin-top: 0.5em;
+     font-size: 0.9em; /* Leggermente più piccolo */
+ }
+
+/* Azioni e Pulsanti */
+#actions button, #global-actions button {
+    display: block; /* Occupa tutta larghezza */
+    margin: 8px 0; /* Spazio verticale tra bottoni */
+    padding: 10px 15px;
+    background-color: #0d6efd; /* Blu standard Bootstrap */
+    color: white;
+    border: none;
+    border-radius: 0.25rem; /* Arrotondamento standard */
+    cursor: pointer;
+    text-align: left; /* Allinea testo a sinistra */
+    font-size: 1em;
+    width: 100%; /* Occupa tutta larghezza contenitore */
+    box-sizing: border-box; /* Padding incluso nella larghezza */
+    transition: background-color 0.15s ease-in-out; /* Transizione hover */
+}
+#actions button:hover, #global-actions button:hover {
+    background-color: #0b5ed7; /* Blu più scuro al hover */
+}
+#actions button:disabled, #global-actions button:disabled {
+    background-color: #6c757d; /* Grigio per disabilitati */
+    cursor: not-allowed; /* Cursore non permesso */
+    opacity: 0.65; /* Leggermente trasparente */
+}
+
+/* Scheda Personaggio */
+#character-sheet ul {
+    list-style: none; /* Rimuove pallini lista */
+    padding: 0;
+    margin: 0 0 10px 0; /* Spazio sotto le liste */
+}
+#character-sheet li {
+    margin-bottom: 5px;
+    padding: 5px 8px; /* Padding interno items */
+    border: 1px solid #e9ecef; /* Bordo leggero */
+    font-size: 0.95em;
+    display: flex; /* Layout flessibile per nome/valore */
+    justify-content: space-between; /* Spinge nome e valore ai lati */
+    flex-wrap: wrap; /* Permette al valore di andare a capo */
+    background-color: #fff; /* Sfondo bianco per items lista */
+    border-radius: 0.2rem;
+}
+#character-sheet li strong { /* Nome statistica/oggetto */
+    margin-right: 8px;
+    font-weight: 600;
+    flex-shrink: 0; /* Non si restringe */
+    color: #495057;
+}
+.stat-value { /* Valore statistica/oggetto */
+    font-weight: bold;
+    text-align: right; /* Allinea a destra */
+    flex-grow: 1; /* Occupa spazio rimanente */
+    color: #0d6efd; /* Colore blu per valori */
+    margin-left: 10px; /* Spazio minimo dal nome */
+}
+#zaino-status { /* Testo stato zaino */
+    font-style: italic;
+    font-size: 0.9em;
+    margin-bottom: 0.5em;
+    color: #6c757d;
+}
+
+/* Opzioni Iniziali */
+#init-options fieldset {
+    border: 1px solid #dee2e6;
+    padding: 10px 15px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+#init-options legend {
+    font-weight: 600;
+    padding: 0 5px;
+}
+#init-options label {
+    display: block;
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+#init-options input[type="checkbox"] {
+    margin-right: 5px;
+    vertical-align: middle; /* Allinea checkbox al testo */
+}
+#init-options button {
+    margin-top: 10px;
+    padding: 8px 12px;
+    /* Usa stili bottone standard */
+    background-color: #198754; /* Verde successo */
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+#init-options button:hover {
+    background-color: #157347;
+}
+#init-options button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+
+/* Combattimento e Lancio Dadi */
+#combat-info, #dice-roll-area {
+    border: 1px solid #ced4da;
+    padding: 12px; /* Aumentato padding */
+    margin-top: 15px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+#combat-info h4 { margin-top: 0; color: #dc3545; /* Rosso pericolo */}
+#combat-enemies { margin-top: 5px; margin-bottom: 10px;} /* Spazio per lista nemici */
+#combat-log {
+    margin-top: 8px;
+    font-size: 0.9em;
+    font-style: italic;
+    max-height: 120px; /* Log leggermente più alto */
+    overflow-y: auto;
+    border-top: 1px dashed #ced4da;
+    padding-top: 8px;
+    color: #6c757d;
+}
+#combat-log p { margin: 3px 0; }
+#dice-roll-area button { /* Bottone lancio dadi */
+    width: auto; /* Non tutta larghezza */
+    margin-right: 10px;
+    padding: 8px 12px;
+    background-color: #6c757d; /* Grigio */
+}
+#dice-roll-area button:hover { background-color: #5a6268; }
+#dice-result { font-weight: bold; }
+
+
+/* Creazione del personaggio */
+.pe-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 5px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+.pe-stat-row span:first-child {
+    flex-grow: 1; /* Nome stat occupa spazio */
+}
+.pe-stat-row div { /* Contenitore per bottoni e counter */
+    display: flex;
+    align-items: center;
+}
+.pe-stat-row button {
+    min-width: 25px; /* Larghezza minima bottoni +/- */
+    height: 25px;
+    padding: 0;
+    font-size: 1.1em;
+    line-height: 23px; /* Centra testo */
+    text-align: center;
+    margin-left: 5px;
+}
+.pe-spent {
+    font-size: 0.8em;
+    color: #6c757d;
+    margin-left: 10px;
+    min-width: 80px; /* Larghezza per allineamento */
+    text-align: right;
+}
+#pe-language-selection label {
+    display: inline-block; /* Mette lingue sulla stessa riga se c'è spazio */
+    margin-right: 15px;
+    margin-bottom: 5px;
+}
+#confirm-pe-button {
+     margin-top: 15px;
+     background-color: #198754; /* Verde */
+}
+#confirm-pe-button:hover {
+     background-color: #157347;
+}
+#confirm-pe-button:disabled {
+     background-color: #6c757d;
+}
+
+
+/* Schermata Game Over */
+#game-over-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(40, 40, 40, 0.85); /* Sfondo scuro semitrasparente */
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    text-align: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+#game-over-overlay h2 { color: #ffc107; /* Giallo warn */}
+#game-over-overlay button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #dc3545; /* Rosso danger */
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    color: white;
+}
+#game-over-overlay button:hover { background-color: #c82333; }
+
+/* Classe Utility per Nascondere Elementi (Accessibilità) */
+.visually-hidden {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+    white-space: nowrap; /* Previene wrap che potrebbe renderlo visibile */
+}
+
+/* Classe Utility per Nascondere Completamente */
+.hidden {
+    display: none !important; /* Usa !important per sovrascrivere altri display */
+}

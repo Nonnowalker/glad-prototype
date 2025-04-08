@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Il titolo verrà impostato dinamicamente da JS -->
+    <title>Caricamento...</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Librerie JS caricate con defer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js" defer></script>
+</head>
+<body>
+    <!-- Skip Link per accessibilità -->
+    <a href="#main-content" class="skip-link" id="skip-link" data-string-key="skipLinkText">Salta al contenuto principale</a>
+
+    <!-- Contenitore Grafica 3D -->
+    <div id="visuals"></div>
+
+    <!-- Contenitore Principale Applicazione -->
+    <div id="container">
+
+        <!-- Selettore Lingua -->
+        <div id="language-selector-container">
+             <label for="lang-select" class="visually-hidden">Seleziona Lingua:</label>
+             <!-- L'attributo onchange è stato rimosso, gestito da main.js -->
+             <select id="lang-select" title="Seleziona Lingua">
+                 <option value="it">Italiano</option>
+                 <option value="en">English</option>
+                 <!-- Aggiungere altre opzioni lingua qui -->
+             </select>
+         </div>
+
+        <!-- Contenuto Principale del Gioco -->
+        <main id="main-content" aria-labelledby="game-title-h1">
+            <div id="game-content">
+
+                <!-- Area Sinistra: Gioco -->
+                <div id="main-text-area">
+                    <!-- Titolo Principale (impostato da JS) -->
+                    <h1 id="game-title-h1" data-string-key="gameTitle"></h1>
+
+                    <!-- Contenitore Immagine (nascosto di default) -->
+                    <div id="chapter-image-container" class="hidden">
+                        <img id="chapter-image" src="" alt=""> <!-- src e alt impostati da JS -->
+                    </div>
+
+                    <!-- Titolo e Testo Capitolo (impostati da JS) -->
+                    <div id="chapter-title-container" tabindex="-1"><h2 id="chapter-title"></h2></div>
+                    <div id="chapter-text" aria-live="polite"></div> <!-- Contenuto impostato da JS -->
+
+                    <!-- Sezione Configurazione Iniziale (nascosta di default) -->
+                    <div id="init-options" class="hidden">
+                         <!-- Fase 1: Spesa Punti Esperienza -->
+                         <div id="pe-spending-options"> <!-- Contenitore specifico per fase PE -->
+                             <h3 data-string-key="configTitlePE"></h3>
+                             <p><strong data-string-key="configPointsRemain"></strong> <span id="pe-remaining">3</span> / 3</p>
+                             <p><small data-string-key="configPointsHelp"></small></p>
+
+                             <h4 data-string-key="combatAbilitiesLabel"></h4>
+                             <div class="pe-stat-row">
+                                 <span>Combattività (Base 5): <span id="temp-stat-combattivita">5</span></span>
+                                 <div>
+                                     <button class="pe-btn-plus" data-stat="combattivita" data-change="1" aria-label="Aumenta Combattività">+</button>
+                                     <button class="pe-btn-minus" data-stat="combattivita" data-change="-1" aria-label="Diminuisci Combattività">-</button>
+                                     <span class="pe-spent">(PE: <span id="pe-spent-combattivita">0</span>/1)</span>
+                                 </div>
+                             </div>
+                              <div class="pe-stat-row">
+                                  <span>Resistenza (Base 30): <span id="temp-stat-resistenza">30</span></span>
+                                  <div>
+                                      <button class="pe-btn-plus" data-stat="resistenza" data-change="3" aria-label="Aumenta Resistenza (+3)">+</button>
+                                      <button class="pe-btn-minus" data-stat="resistenza" data-change="-3" aria-label="Diminuisci Resistenza (-3)">-</button>
+                                      <span class="pe-spent">(PE: <span id="pe-spent-resistenza">0</span>/1)</span>
+                                  </div>
+                              </div>
+
+                             <h4 data-string-key="genericAbilitiesLabel"></h4>
+                             <div class="pe-stat-row"><span>Mira: <span id="temp-stat-mira">0</span></span><div><button class="pe-btn-plus" data-stat="mira" data-change="1" aria-label="Aumenta Mira">+</button><button class="pe-btn-minus" data-stat="mira" data-change="-1" aria-label="Diminuisci Mira">-</button><span class="pe-spent">(PE: <span id="pe-spent-mira">0</span>/1)</span></div></div>
+                             <div class="pe-stat-row"><span>Movimento: <span id="temp-stat-movimento">0</span></span><div><button class="pe-btn-plus" data-stat="movimento" data-change="1" aria-label="Aumenta Movimento">+</button><button class="pe-btn-minus" data-stat="movimento" data-change="-1" aria-label="Diminuisci Movimento">-</button><span class="pe-spent">(PE: <span id="pe-spent-movimento">0</span>/1)</span></div></div>
+                             <div class="pe-stat-row"><span>Sotterfugio: <span id="temp-stat-sotterfugio">0</span></span><div><button class="pe-btn-plus" data-stat="sotterfugio" data-change="1" aria-label="Aumenta Sotterfugio">+</button><button class="pe-btn-minus" data-stat="sotterfugio" data-change="-1" aria-label="Diminuisci Sotterfugio">-</button><span class="pe-spent">(PE: <span id="pe-spent-sotterfugio">0</span>/1)</span></div></div>
+                             <div class="pe-stat-row"><span>Scassinare: <span id="temp-stat-scassinare">0</span></span><div><button class="pe-btn-plus" data-stat="scassinare" data-change="1" aria-label="Aumenta Scassinare">+</button><button class="pe-btn-minus" data-stat="scassinare" data-change="-1" aria-label="Diminuisci Scassinare">-</button><span class="pe-spent">(PE: <span id="pe-spent-scassinare">0</span>/1)</span></div></div>
+                             <div class="pe-stat-row"><span>Percezione: <span id="temp-stat-percezione">0</span></span><div><button class="pe-btn-plus" data-stat="percezione" data-change="1" aria-label="Aumenta Percezione">+</button><button class="pe-btn-minus" data-stat="percezione" data-change="-1" aria-label="Diminuisci Percezione">-</button><span class="pe-spent">(PE: <span id="pe-spent-percezione">0</span>/1)</span></div></div>
+                             <div class="pe-stat-row"><span>Conoscenza Arcana: <span id="temp-stat-conoscenzaArcana">0</span></span><div><button class="pe-btn-plus" data-stat="conoscenzaArcana" data-change="1" aria-label="Aumenta Conoscenza Arcana">+</button><button class="pe-btn-minus" data-stat="conoscenzaArcana" data-change="-1" aria-label="Diminuisci Conoscenza Arcana">-</button><span class="pe-spent">(PE: <span id="pe-spent-conoscenzaArcana">0</span>/1)</span></div></div>
+
+                             <h4 data-string-key="additionalLanguageLabel"></h4>
+                             <div id="pe-language-selection">
+                                 <!-- Checkbox e label generati/aggiornati da JS, ma la struttura base è qui -->
+                                 <label><input type="checkbox" value="Adunaico"> <span data-string-key="lang_adunaico"></span></label>
+                                 <label><input type="checkbox" value="Esterling"> <span data-string-key="lang_esterling"></span></label>
+                                 <label><input type="checkbox" value="Linguaggio Nero"> <span data-string-key="lang_linguaggio_nero"></span></label>
+                                 <label><input type="checkbox" value="Nahaiduk"> <span data-string-key="lang_nahaiduk"></span></label>
+                                 <label><input type="checkbox" value="Orchesco"> <span data-string-key="lang_orchesco"></span></label>
+                                 <label><input type="checkbox" value="Quenya"> <span data-string-key="lang_quenya"></span></label>
+                                 <label><input type="checkbox" value="Segnali Naturali"> <span data-string-key="lang_segnali_naturali"></span></label>
+                                 <label><input type="checkbox" value="Sindarin"> <span data-string-key="lang_sindarin"></span></label>
+                             </div>
+                              <span class="pe-spent">(PE: <span id="pe-spent-lingua">0</span>/1)</span>
+
+                             <!-- Bottone Conferma PE (handler in main.js) -->
+                             <button id="confirm-pe-button" disabled data-string-key="confirmPEButton"></button>
+                         </div>
+
+                         <!-- Fase 2: Scelta Oggetti Iniziali (nascosto inizialmente) -->
+                         <div id="initial-items-options" class="hidden">
+                             <h3 data-string-key="configItemsTitle"></h3>
+                             <p data-string-key="configItemsLabel"></p>
+                             <fieldset>
+                                <legend data-string-key="configItemsLegend"></legend>
+                                 <div id="initial-items-selection">
+                                     <!-- Checkbox e Label con data-string-key per multilingua -->
+                                     <label for="init-item-item_spada_aggiuntiva"><input type="checkbox" id="init-item-item_spada_aggiuntiva" value="Spada/Arma da corpo a corpo" data-type="Arma"> <span data-string-key="item_spada_aggiuntiva"></span></label>
+                                     <label for="init-item-item_chiodi_roccia"><input type="checkbox" id="init-item-item_chiodi_roccia" value="Chiodi da Roccia" data-type="Generico"> <span data-string-key="item_chiodi_roccia"></span></label>
+                                     <label for="init-item-item_corda"><input type="checkbox" id="init-item-item_corda" value="Corda" data-type="Generico"> <span data-string-key="item_corda"></span></label>
+                                     <label for="init-item-item_cuneo_legno"><input type="checkbox" id="init-item-item_cuneo_legno" value="Cuneo di Legno" data-type="Generico"> <span data-string-key="item_cuneo_legno"></span></label>
+                                     <label for="init-item-item_lanterna"><input type="checkbox" id="init-item-item_lanterna" value="Lanterna" data-type="Generico"> <span data-string-key="item_lanterna"></span></label>
+                                     <label for="init-item-item_piede_porco"><input type="checkbox" id="init-item-item_piede_porco" value="Piede di Porco" data-type="Generico"> <span data-string-key="item_piede_porco"></span></label>
+                                     <label for="init-item-item_tenda_smontabile"><input type="checkbox" id="init-item-item_tenda_smontabile" value="Tenda Smontabile" data-type="Generico"> <span data-string-key="item_tenda_smontabile"></span></label>
+                                     <label for="init-item-item_pozione_guaritrice"><input type="checkbox" id="init-item-item_pozione_guaritrice" value="Pozione Guaritrice" data-type="Generico"> <span data-string-key="item_pozione_guaritrice"></span></label>
+                                </div>
+                             </fieldset>
+                              <p><small data-string-key="configItemsNote"></small></p>
+                             <!-- Bottone Inizio Avventura (handler in main.js) -->
+                             <button id="start-game-button" disabled data-string-key="startGameButton"></button>
+                         </div>
+                    </div> <!-- Fine init-options -->
+
+                     <!-- Area Lancio Dadi per Skill Check (nascosto di default) -->
+                     <div id="dice-roll-area" class="hidden">
+                         <div id="skill-check-prompt"></div>
+                         <!-- Bottone Tira Dadi (handler in main.js) -->
+                         <button id="roll-dice-button" data-string-key="rollDiceButton"></button>
+                         <span id="dice-result" aria-live="polite"></span>
+                     </div>
+
+                    <!-- Area Informazioni Combattimento (nascosto di default) -->
+                    <div id="combat-info" class="hidden" role="region" aria-labelledby="combat-heading">
+                         <h4 id="combat-heading" data-string-key="combatHeading"></h4>
+                         <ul id="combat-enemies"></ul> <!-- Lista nemici popolata da JS -->
+                         <div id="combat-log" role="log" aria-live="polite"></div> <!-- Log popolato da JS -->
+                    </div>
+
+                    <!-- Azioni / Scelte del Capitolo (popolato da JS) -->
+                    <nav id="actions" aria-label="Azioni del capitolo"></nav>
+
+                    <!-- Separatore e Azioni Globali -->
+                    <hr class="separator">
+                    <div id="global-actions">
+                         <!-- Bottoni Globali (handler in main.js) -->
+                         <button id="save-button" data-string-key="saveButton"></button>
+                         <button id="load-button" data-string-key="loadButton"></button>
+                         <button id="new-game-button" data-string-key="newGameButton"></button>
+                    </div>
+                </div>
+
+                <!-- Area Destra: Scheda Personaggio -->
+                <aside id="character-sheet-container" aria-labelledby="character-sheet-title-h2">
+                    <div id="character-sheet" aria-live="polite">
+                        <h2 id="character-sheet-title-h2" data-string-key="charSheetTitle"></h2>
+                         <h3 data-string-key="abilitiesLabel"></h3>
+                         <ul>
+                             <li><strong>Combattività:</strong> <span id="stat-combattivita" class="stat-value">0</span></li>
+                             <li><strong>Resistenza:</strong> <span><span id="stat-resistenza" class="stat-value">0</span> / <span id="stat-resistenza-max">30</span></span></li>
+                             <li><strong>Mira:</strong> <span id="stat-mira" class="stat-value">0</span></li>
+                             <li><strong>Movimento:</strong> <span id="stat-movimento" class="stat-value">0</span></li>
+                             <li><strong>Sotterfugio:</strong> <span id="stat-sotterfugio" class="stat-value">0</span></li>
+                             <li><strong>Scassinare:</strong> <span id="stat-scassinare" class="stat-value">0</span></li>
+                             <li><strong>Percezione:</strong> <span id="stat-percezione" class="stat-value">0</span></li>
+                             <li><strong>Conoscenza Arcana:</strong> <span id="stat-conoscenza-arcana" class="stat-value">0</span></li>
+                         </ul>
+                         <h3 data-string-key="languagesLabel"></h3>
+                         <ul id="lingue-list"></ul>
+                          <h3 data-string-key="goldLabel"></h3>
+                          <p><span id="monete-oro" class="stat-value">0</span> / 30</p>
+                          <h3 data-string-key="equipmentLabel"></h3>
+                          <div id="zaino-status"><span data-string-key="backpackStatusLabel"></span> <input type="checkbox" id="has-zaino" disabled aria-label="Possesso Zaino"> (<span id="zaino-count">0</span>/8)</div>
+                          <h4 data-string-key="weaponsLabel"></h4>
+                          <ul id="armi-list"></ul>
+                          <h4 data-string-key="wornItemsLabel"></h4>
+                          <ul id="indossati-list"></ul>
+                          <h4 data-string-key="backpackItemsLabel"></h4>
+                          <ul id="zaino-list"></ul>
+                          <h3 data-string-key="keywordsLabel"></h3>
+                          <h4 data-string-key="currentKeywordsLabel"></h4>
+                          <ul id="keywords-attuali-list"></ul>
+                          <h4 data-string-key="permanentKeywordsLabel"></h4>
+                          <ul id="keywords-permanenti-list"></ul>
+                    </div>
+                </aside>
+            </div>
+        </main>
+
+        <!-- Regione per messaggi accessibili letti da screen reader -->
+        <div id="game-messages" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+        <!-- Overlay per Game Over (nascosto di default) -->
+        <div id="game-over-overlay" class="hidden">
+            <h2 data-string-key="gameOverTitle"></h2>
+            <p id="game-over-reason"></p>
+            <!-- Bottone Ricarica (handler inline semplice o aggiunto in JS) -->
+            <button onclick="location.reload()" data-string-key="gameOverReloadButton"></button>
+        </div>
+    </div>
+
+    <!-- Load Scripts (Ordine importante!) -->
+    <script src="strings.js" defer></script>      <!-- 1. Definizioni stringhe e funzioni getString/setLanguage -->
+    <script src="gameData.js" defer></script>    <!-- 2. Dati dei capitoli (generato) -->
+    <script src="state.js" defer></script>       <!-- 3. Gestione stato (gameState) e persistenza (save/load/reset/addItem/removeItem) -->
+    <script src="three_setup.js" defer></script> <!-- 4. Grafica 3D (può essere quasi indipendente) -->
+    <script src="ui.js" defer></script>          <!-- 5. Funzioni manipolazione DOM / UI (usa variabili stato e stringhe) -->
+    <script src="engine.js" defer></script>      <!-- 6. Motore di gioco (usa stato, stringhe, dati, funzioni UI) -->
+    <script src="main.js" defer></script>        <!-- 7. Punto ingresso, init, eventi globali (chiama funzioni da tutti gli altri) -->
+</body>
+</html>
