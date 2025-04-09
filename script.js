@@ -883,14 +883,68 @@ function initializeApp() {
         return;
     }
 
-    // 2. Verifica dipendenze critiche (solo le funzioni base, le altre vengono verificate al momento dell'uso)
-    console.log("initializeApp: Verifica dipendenze base...");
-    if (typeof THREE === 'undefined' || typeof uiStrings === 'undefined' || typeof gameData === 'undefined' || typeof initialGameState === 'undefined' || typeof getString !== 'function' || typeof initThree !== 'function' || typeof updateAllUIStrings !== 'function' || typeof displayInitialStateUI !== 'function' || typeof setLanguage !== 'function' ) {
-         console.error("Errore CRITICO: Funzioni/Oggetti base mancanti!");
-         document.body.innerHTML = `<h1 style="color:red;">Errore Inizializzazione Critico. Controlla console.</h1>`;
-         return;
+    // 2. Verifica dipendenze critiche (più dettagliata)
+    console.log("initializeApp: Verifica dipendenze dettagliata...");
+    const dependenciesToCheck = {
+        // Oggetti/Variabili
+        THREE: typeof THREE,
+        SimplexNoise: typeof SimplexNoise, // Da three_setup? No, globale da CDN
+        uiStrings: typeof uiStrings,         // da strings.js
+        gameData: typeof gameData,           // da gameData.js
+        initialGameState: typeof initialGameState, // da state (Sezione 1)
+        gameState: typeof gameState,         // da state (Sezione 1)
+        currentLang: typeof currentLang,     // da strings.js
+
+        // Funzioni Chiave
+        getString: typeof getString,           // da strings.js
+        setLanguage: typeof setLanguage,       // da strings.js
+        initThree: typeof initThree,             // da three_setup
+        cacheDOMElements: typeof cacheDOMElements,   // da ui (Sezione 2)
+        updateAllUIStrings: typeof updateAllUIStrings, // da ui (Sezione 2)
+        displayInitialStateUI: typeof displayInitialStateUI, // da ui (Sezione 2)
+        showInitScreen: typeof showInitScreen,       // da ui (Sezione 2)
+        displayChapter: typeof displayChapter,     // da engine (Sezione 3)
+        saveGame: typeof saveGame,             // da state (Sezione 1)
+        loadGame: typeof loadGame,             // da state (Sezione 1)
+        resetGame: typeof resetGame,           // da state (Sezione 1)
+        addItem: typeof addItem,               // da state (Sezione 1)
+        removeItem: typeof removeItem,           // da state (Sezione 1)
+        updateCharacterSheetUI: typeof updateCharacterSheetUI, // da ui (Sezione 2)
+        updateCombatUI: typeof updateCombatUI,       // da ui (Sezione 2)
+        updateSkillCheckUI: typeof updateSkillCheckUI,   // da ui (Sezione 2)
+        applyEffect: typeof applyEffect,           // da engine (Sezione 3)
+        checkCondition: typeof checkCondition,       // da engine (Sezione 3)
+        resolveSkillCheck: typeof resolveSkillCheck,   // da engine (Sezione 3)
+        handleCombatActionAttack: typeof handleCombatActionAttack, // da engine (Sezione 3)
+        handleGameOver: typeof handleGameOver,       // da engine (Sezione 3)
+        changeStatPE: typeof changeStatPE,           // da engine (Sezione 3)
+        handleLanguageSelection: typeof handleLanguageSelection, // da engine (Sezione 3)
+        confirmPESpending: typeof confirmPESpending,   // da engine (Sezione 3)
+        startGame: typeof startGame,               // da engine (Sezione 3)
+        handleInitialItemChange: typeof handleInitialItemChange, // da ui (Sezione 2)
+        // Aggiungi altre funzioni se necessario
+    };
+
+    let missingDepsDetailed = [];
+    console.log("--- Risultati Verifica Dipendenze ---");
+    for (const depName in dependenciesToCheck) {
+        const type = dependenciesToCheck[depName];
+        console.log(`  - ${depName}: ${type}`);
+        if (type === 'undefined') {
+            missingDepsDetailed.push(depName);
+        }
+    }
+    console.log("------------------------------------");
+
+
+    if (missingDepsDetailed.length > 0) {
+         console.error("Errore CRITICO: Una o più dipendenze base mancanti o non definite!", missingDepsDetailed);
+         document.body.innerHTML = `<h1 style="color:red; text-align:center;">Errore Inizializzazione Critico (${missingDepsDetailed.join(', ')} mancante/i).</h1>`;
+         return; // Blocca esecuzione
      }
-     console.log("initializeApp: Dipendenze base OK.");
+     console.log("initializeApp: Dipendenze base verificate con successo.");
+
+    // ... resto di initializeApp (chiamate a initThree, updateAllUIStrings, etc.) ...
 
     // 3. Init Three.js (definita in Sezione Three.js - se la mettiamo qui)
     // O assumiamo sia definita globalmente da three_setup.js
