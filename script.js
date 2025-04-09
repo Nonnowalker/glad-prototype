@@ -6,49 +6,48 @@
 // ======================================================
 console.log("script.js: Inizializzazione variabili stato...");
 
-// --- Stato Globale del Gioco ---
 let gameState = {}; // Stato corrente del gioco, inizializzato vuoto all'inizio
 
-// --- Variabili Temporanee per Configurazione Iniziale ---
-// Queste vengono popolate solo durante la fase di creazione del personaggio
+// Variabili temporanee usate SOLO durante la configurazione del personaggio (Fase PE Spending)
+// Vengono inizializzate correttamente da showInitScreen
 let tempStats = {};
 let tempLang = null;
 let peSpent = { total: 0, combattivita: 0, resistenza: 0, mira: 0, movimento: 0, sotterfugio: 0, scassinare: 0, percezione: 0, conoscenzaArcana: 0, lingua: 0 };
 
-// --- Log di Combattimento (Volatile) ---
+// Array per contenere i messaggi di log del combattimento corrente (volatile)
 let combatLog = [];
 
 // --- Stato Iniziale Default (Costante) ---
 // Definisce la struttura e i valori di partenza per una nuova partita.
-const initialGameState = Object.freeze({ // Impedisce modifiche accidentali all'oggetto base
+const initialGameState = Object.freeze({ // Usa Object.freeze per prevenire modifiche accidentali
     chapter: 0,
     stats: {
         combattivita: 5,
         resistenza: 30,
-        resistenzaMax: 30,
+        resistenzaMax: 30, // Memorizza il massimo per recuperi/clamp
         mira: 0,
         movimento: 0,
         sotterfugio: 0,
         scassinare: 0,
         percezione: 0,
         conoscenzaArcana: 0,
-        puntiEsperienza: 3
+        puntiEsperienza: 3 // Punti da spendere all'inizio
     },
-    lingue: ["Lingua Comune"],
-    moneteOro: 5,
+    lingue: ["Lingua Comune"], // Lingua base
+    moneteOro: 5, // Oro iniziale
     inventory: {
-        armi: ["Spada/Arma da corpo a corpo", "Arco/Arma dalla distanza"],
-        indossati: ["Corpetto di Cuoio/Armatura", "Scudo/Scudo"],
-        zaino: [],
-        hasZaino: true
+        armi: ["Spada/Arma da corpo a corpo", "Arco/Arma dalla distanza"], // Equip base
+        indossati: ["Corpetto di Cuoio/Armatura", "Scudo/Scudo"], // Equip base
+        zaino: [], // Zaino inizia vuoto (a parte oggetti scelti)
+        hasZaino: true // Il personaggio inizia con uno zaino
     },
     keywords: {
-        attuali: [],
-        permanenti: []
+        attuali: [],   // Parole chiave valide solo per la sessione corrente (o avventura?)
+        permanenti: [] // Parole chiave che persistono tra salvataggi/avventure
     },
-    combat: null,
-    skillCheck: null,
-    gameOver: false
+    combat: null,       // Oggetto che conterrà i dati del combattimento attivo (o null)
+    skillCheck: null,   // Oggetto che conterrà i dati dello skill check attivo (o null)
+    gameOver: false     // Flag per indicare se il gioco è terminato
 });
 
 // Chiave usata per salvare/caricare da localStorage
@@ -58,25 +57,29 @@ const SAVE_KEY = 'librogameIlPassoMorteState';
 
 /**
  * Salva lo stato corrente del gioco (`gameState`) in localStorage.
- * Salva solo se il gioco è iniziato (ha statistiche valide), non è al capitolo 0, e non è game over.
+ * Salva solo se il gioco è iniziato (ha statistiche valide),
+ * non è al capitolo 0, e non è in stato di game over.
  */
 function saveGame() {
+    // Verifica condizioni per il salvataggio
     if (gameState && gameState.stats && gameState.chapter !== 0 && !gameState.gameOver) {
         try {
+            // Converte l'oggetto gameState in una stringa JSON e la salva
             localStorage.setItem(SAVE_KEY, JSON.stringify(gameState));
             console.log('Partita Salvata (stato attuale).');
-            // La notifica UI è gestita da chi chiama saveGame (in questo caso, la funzione wrapper in questo stesso file)
-            if (typeof announceMessage === 'function' && typeof getString === 'function') {
-                announceMessage(getString('infoGameSaved'));
-            } else {
-                console.warn("Funzioni per messaggio salvataggio mancanti.");
-            }
+            // La notifica accessibile viene gestita da chi chiama saveGame (es. in main.js)
+             if(typeof announceMessage === 'function' && typeof getString === 'function') {
+                 announceMessage(getString('infoGameSaved'));
+             } else {
+                 console.warn("Funzioni announceMessage/getString non disponibili per notifica salvataggio.");
+             }
         } catch (e) {
+            // Gestisce errori (es. localStorage pieno)
             console.error("Errore nel salvataggio in localStorage:", e);
-            if (typeof announceMessage === 'function' && typeof getString === 'function') {
+            if(typeof announceMessage === 'function' && typeof getString === 'function') {
                 announceMessage(getString('errorSaveFailed'), 'assertive');
             } else {
-                alert("Errore Salvataggio!"); // Fallback
+                alert("Errore Salvataggio!"); // Fallback alert
             }
         }
     } else {
@@ -89,20 +92,20 @@ function saveGame() {
  * @returns {boolean} True se il caricamento ha avuto successo e i dati sono validi, False altrimenti.
  */
 function loadGame() {
-    const savedState = localStorage.getItem(SAVE_KEY);
+    const savedState = localStorage.getItem(SAVE_KEY); // Recupera stringa JSON
     if (savedState) {
         try {
-            const loadedData = JSON.parse(savedState);
-            // Validazione più robusta della struttura dati caricata
+            const loadedData = JSON.parse(savedState); // Converte stringa in oggetto
+            // Validazione minima della struttura dati caricata
             if (!loadedData || typeof loadedData !== 'object' || typeof loadedData.chapter !== 'number' || typeof loadedData.stats !== 'object' || typeof loadedData.inventory !== 'object' || !Array.isArray(loadedData.lingue) || typeof loadedData.moneteOro !== 'number' || typeof loadedData.keywords !== 'object' || !Array.isArray(loadedData.keywords.attuali) || !Array.isArray(loadedData.keywords.permanenti)) {
                 throw new Error("Dati salvati non validi o struttura incompleta/corrotta.");
             }
             // Sovrascrive lo stato corrente con quello caricato
             gameState = loadedData;
-            // Resetta stati volatili che non devono persistere o essere caricati
-            gameState.gameOver = false; // Il gioco riprende
-            gameState.combat = null;    // Non si carica in combattimento
-            gameState.skillCheck = null; // Non si carica in skill check
+            // Resetta stati volatili che non dovrebbero persistere o essere caricati
+            gameState.gameOver = false; // Assicura che non sia game over
+            gameState.combat = null;    // Non si carica mai in mezzo a un combattimento
+            gameState.skillCheck = null; // Non si carica mai in mezzo a uno skill check
             combatLog = [];             // Resetta il log testuale volatile
 
             console.log('Partita Caricata con successo.');
@@ -145,7 +148,7 @@ function resetGame(confirmReset = true) {
 
 /**
  * Aggiunge un oggetto all'inventario del giocatore.
- * @param {string} itemName - Nome completo oggetto.
+ * @param {string} itemName - Nome completo oggetto (es. "Spada/Arma...").
  * @param {string} itemType - Tipo ('Arma', 'Indossato', 'Generico').
  * @returns {boolean} True se aggiunto, False altrimenti.
  */
@@ -189,25 +192,35 @@ function addItem(itemName, itemType) {
  */
 function removeItem(itemNameToRemove) {
      if (!gameState || !gameState.inventory || typeof announceMessage !== 'function' || typeof getString !== 'function' || typeof updateCharacterSheetUI !== 'function') {
-         console.error("removeItem: Dipendenze mancanti!"); return false;
-     }
+          console.error("removeItem: Dipendenze mancanti!"); return false;
+      }
     let removed = false; const lowerItemName = itemNameToRemove.toLowerCase();
     const cleanItemName = itemNameToRemove.split('/')[0].trim();
     const itemKey = cleanItemName.toLowerCase().replace(/\s+/g, '_');
     const inv = gameState.inventory;
 
-    if (cleanItemName.toLowerCase() === "zaino") {
+    if (cleanItemName.toLowerCase() === "zaino") { // Caso speciale Zaino
          if(inv.hasZaino) { inv.hasZaino = false; inv.zaino = []; removed = true; announceMessage(getString('infoItemRemoved', {itemName: getString('backpackStatusLabel')})); }
-     } else {
+     } else { // Cerca nelle liste
          const lists = ['zaino', 'armi', 'indossati'];
          for (const listName of lists) {
-             if (!inv[listName]) continue; // Salta se la lista non esiste
+             if (!inv[listName]) continue; // Salta se lista non esiste
+             // Cerca un item che *inizia* con il nome pulito (case-insensitive)
              const index = inv[listName].findIndex(item => item.toLowerCase().startsWith(cleanItemName.toLowerCase()));
-             if (index !== -1) { const removedItemFullName = inv[listName].splice(index, 1)[0]; removed = true; announceMessage(getString('infoItemRemoved', { itemName: removedItemFullName.split('/')[0] })); break; }
+             if (index !== -1) {
+                 const removedItemFullName = inv[listName].splice(index, 1)[0]; // Rimuove e ottiene nome completo
+                 removed = true;
+                 console.log(`${removedItemFullName} rimosso da ${listName}`);
+                 announceMessage(getString('infoItemRemoved', { itemName: removedItemFullName.split('/')[0] }));
+                 break; // Esce dopo aver trovato e rimosso il primo match
+             }
          }
      }
-    if(removed) { updateCharacterSheetUI(); }
-    else { console.warn(`Oggetto non trovato per rimozione: ${itemNameToRemove}`); }
+    if(removed) {
+        updateCharacterSheetUI(); // Aggiorna la scheda se qualcosa è stato rimosso
+    } else {
+        console.warn(`Oggetto non trovato per rimozione: ${itemNameToRemove}`);
+    }
     return removed;
 }
 
@@ -223,7 +236,7 @@ console.log("script.js: Sezione 1 (Stato e Persistenza) definita.");
 // ======================================================
 
 // --- Riferimenti Elementi UI (Variabili globali) ---
-// Popolate da cacheDOMElements()
+// Popolate da cacheDOMElements() chiamata da initializeApp()
 let chapterTextEl, actionsEl, combatInfoEl, combatEnemiesEl, combatLogEl, diceRollEl,
     diceResultEl, skillCheckPromptEl, rollDiceButton, chapterTitleEl, chapterTitleContainer,
     imageContainer, imageEl, initOptionsEl, peSpendingOptionsEl, initialItemsOptionsEl,
@@ -236,14 +249,14 @@ let chapterTextEl, actionsEl, combatInfoEl, combatEnemiesEl, combatLogEl, diceRo
 
 /**
  * Ottiene e memorizza i riferimenti agli elementi principali del DOM.
- * DA CHIAMARE UNA SOLA VOLTA da main.js (Sezione 4) dopo DOMContentLoaded.
+ * DA CHIAMARE UNA SOLA VOLTA da initializeApp() dopo DOMContentLoaded.
  */
 function cacheDOMElements() {
-    console.log("cacheDOMElements: Inizio caching..."); // Log inizio caching
+    console.log("cacheDOMElements: Inizio caching...");
     chapterTextEl = document.getElementById('chapter-text');
     actionsEl = document.getElementById('actions');
     combatInfoEl = document.getElementById('combat-info');
-    combatEnemiesEl = document.getElementById('combat-enemies'); // ID corretto da HTML
+    combatEnemiesEl = document.getElementById('combat-enemies');
     combatLogEl = document.getElementById('combat-log');
     diceRollEl = document.getElementById('dice-roll-area');
     diceResultEl = document.getElementById('dice-result');
@@ -253,7 +266,7 @@ function cacheDOMElements() {
     chapterTitleContainer = document.getElementById('chapter-title-container');
     imageContainer = document.getElementById('chapter-image-container');
     imageEl = document.getElementById('chapter-image');
-    initOptionsEl = document.getElementById('init-options'); // Vecchio contenitore, verificare se ancora usato o rimuovere
+    initOptionsEl = document.getElementById('init-options'); // Contenitore generale init (verificare se usato)
     peSpendingOptionsEl = document.getElementById('pe-spending-options');
     initialItemsOptionsEl = document.getElementById('initial-items-options');
     initItemsSelectionEl = document.getElementById('initial-items-selection');
@@ -290,8 +303,8 @@ function cacheDOMElements() {
     // Verifica elementi critici per UI base
     if (!chapterTextEl || !actionsEl || !characterSheetEl || !globalActionsContainer) {
          console.error("FATAL: Elementi UI principali (#chapter-text, #actions, #character-sheet, #global-actions) non trovati! Controlla index.html.");
-         document.body.innerHTML = "<h1>Errore: Interfaccia utente non caricata correttamente (mancano elementi chiave).</h1>";
-         throw new Error("Elementi UI critici mancanti."); // Blocca esecuzione se mancano elementi base
+         // Potrebbe essere utile bloccare qui o mostrare un errore all'utente
+         // throw new Error("Elementi UI critici mancanti.");
     } else {
         console.log("Elementi DOM Caching completato.");
     }
@@ -304,55 +317,64 @@ function cacheDOMElements() {
  * Mostra lo stato iniziale della UI (capitolo 0, nasconde elementi specifici).
  */
 function displayInitialStateUI() {
-    if (!chapterTextEl || !chapterTitleEl || !actionsEl || !globalActionsContainer) { console.error("displayInitialStateUI: Elementi UI principali non trovati!"); return; }
+    // Assicurati che gli elementi DOM siano stati cachati
+    if (!chapterTextEl || !chapterTitleEl || !actionsEl || !globalActionsContainer) { console.error("displayInitialStateUI: Elementi UI principali non trovati/caricati!"); return; }
 
     // Mostra testo capitolo 0
+    // Verifica che gameData e getString siano disponibili
     if (typeof gameData !== 'undefined' && typeof getString === 'function' && gameData["0"]) {
          const introChapter = gameData["0"];
          chapterTextEl.innerHTML = introChapter.text ? introChapter.text.replace(/\n/g, '<br>') : getString('loadingText');
          chapterTitleEl.textContent = introChapter.title || '';
-         if (introChapter.images && introChapter.images.length > 0 && imageContainer) imageContainer.classList.add('hidden');
+         // Nasconde immagine del cap 0 se presente nei dati
+         if (introChapter.images && introChapter.images.length > 0 && imageContainer) {
+             imageContainer.classList.add('hidden');
+         }
     } else {
          chapterTextEl.innerHTML = (typeof getString === 'function') ? getString('loadingText') : 'Loading...';
          chapterTitleEl.textContent = '';
     }
-    // Nasconde sezioni specifiche
+    // Nasconde tutte le sezioni specifiche
     actionsEl.innerHTML = '';
     if(peSpendingOptionsEl) peSpendingOptionsEl.classList.add('hidden');
     if(initialItemsOptionsEl) initialItemsOptionsEl.classList.add('hidden');
-    if(initOptionsEl) initOptionsEl.classList.add('hidden');
+    if(initOptionsEl) initOptionsEl.classList.add('hidden'); // Nasconde vecchio container
     if(combatInfoEl) combatInfoEl.classList.add('hidden');
     if(diceRollEl) diceRollEl.classList.add('hidden');
-    if(imageContainer) imageContainer.classList.add('hidden');
+    if(imageContainer && !(gameData && gameData["0"] && gameData["0"].images?.length > 0)) { // Nasconde se non è intro con immagine
+        imageContainer.classList.add('hidden');
+    }
     if(gameOverOverlay) gameOverOverlay.classList.add('hidden');
 
-    updateCharacterSheetUI(); // Aggiorna scheda (mostra valori vuoti/default)
+    updateCharacterSheetUI(); // Aggiorna per mostrare vuoto/default
     if(globalActionsContainer) globalActionsContainer.querySelectorAll('button').forEach(b => b.disabled = false); // Abilita bottoni globali
 }
 
 /**
  * Prepara e mostra l'interfaccia per la configurazione iniziale del personaggio (Fase 1: Spesa PE).
+ * Chiamata da resetGameAndUpdateUI (in Sezione 4).
  */
 function showInitScreen() {
      // Verifica esistenza funzioni/stato base necessari
-     if (typeof initialGameState === 'undefined' || typeof gameState === 'undefined' || typeof JSON === 'undefined' || typeof updateAllUIStrings !== 'function' || typeof displayInitialStateUI !== 'function' || typeof setupPESpendingUI !== 'function' || typeof updatePESpendingUI !== 'function' || typeof updateLanguageSelectionLabels !== 'function' || typeof getString !== 'function' || typeof announceMessage !== 'function') { console.error("Errore critico: Dipendenze mancanti per showInitScreen!"); if(chapterTextEl) chapterTextEl.textContent = getString('errorGeneric') || "Errore"; return; }
+     // Nota: tempStats e peSpent sono definite globalmente (in questo file, Sezione 1)
+     if (typeof initialGameState === 'undefined' || typeof gameState === 'undefined' || typeof JSON === 'undefined' || typeof updateAllUIStrings !== 'function' || typeof displayInitialStateUI !== 'function' || typeof updatePESpendingUI !== 'function' || typeof updateLanguageSelectionLabels !== 'function' || typeof getString !== 'function' || typeof announceMessage !== 'function') { console.error("Errore critico: Dipendenze mancanti per showInitScreen!"); if(chapterTextEl) chapterTextEl.textContent = getString('errorGeneric') || "Errore"; return; }
 
     console.log("showInitScreen: Avvio configurazione personaggio...");
-    // Resetta stato temporaneo per spesa PE
-    tempStats = JSON.parse(JSON.stringify(initialGameState.stats));
+    // Resetta stato temporaneo per spesa PE (variabili in Sezione 1)
+    tempStats = JSON.parse(JSON.stringify(initialGameState.stats)); // Copia stats base
     tempLang = null;
     peSpent = { total: 0, combattivita: 0, resistenza: 0, mira: 0, movimento: 0, sotterfugio: 0, scassinare: 0, percezione: 0, conoscenzaArcana: 0, lingua: 0 };
 
-    // Mostra la UI corretta
-    // Non chiamare displayInitialStateUI qui, resetterebbe troppo
-    if(actionsEl) actionsEl.innerHTML = '';
-    if(initialItemsOptionsEl) initialItemsOptionsEl.classList.add('hidden');
+    // Mostra la UI corretta (nasconde gioco/altre init, mostra spesa PE)
+    // displayInitialStateUI(); // Non chiamare questo qui, resetterebbe troppo
+    if(actionsEl) actionsEl.innerHTML = ''; // Pulisce azioni capitolo
+    if(initialItemsOptionsEl) initialItemsOptionsEl.classList.add('hidden'); // Nasconde scelta oggetti
     if(combatInfoEl) combatInfoEl.classList.add('hidden');
     if(diceRollEl) diceRollEl.classList.add('hidden');
     if(imageContainer) imageContainer.classList.add('hidden');
     if(gameOverOverlay) gameOverOverlay.classList.add('hidden');
     if(peSpendingOptionsEl) peSpendingOptionsEl.classList.remove('hidden'); else console.error("Elemento peSpendingOptionsEl non trovato!");
-    // if(initOptionsEl) initOptionsEl.classList.remove('hidden'); // Non più necessario se non è un container separato
+    // if(initOptionsEl) initOptionsEl.classList.remove('hidden'); // Non serve se peSpendingOptionsEl è il container principale
 
     // Imposta titolo e pulisce testo
     if(chapterTitleEl) chapterTitleEl.textContent = getString('configTitlePE'); else console.error("Elemento chapterTitleEl non trovato!");
@@ -361,82 +383,139 @@ function showInitScreen() {
     // Resetta Checkbox Lingue
     if(peLanguageSelectionEl) { peLanguageSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.disabled = false; }); }
 
-    // Aggiorna UI spesa PE e label
-    updatePESpendingUI();
-    updateLanguageSelectionLabels();
-    updateAllUIStrings(); // Aggiorna tutti gli altri testi statici
+    // Aggiorna la UI della spesa PE e le label
+    updatePESpendingUI(); // Aggiorna valori e stato bottoni PE
+    updateLanguageSelectionLabels(); // Aggiorna testi label lingue
+    updateAllUIStrings(); // Aggiorna tutti gli altri testi statici (inclusi titoli sezioni PE)
+
+    // L'handler per confirmPEButton è associato in Sezione 4 (main)
 
     announceMessage(getString('infoConfigStart'));
     if(chapterTitleContainer) chapterTitleContainer.focus(); else console.warn("chapterTitleContainer non trovato per focus.");
 }
 
+
 /**
  * Prepara la UI per la schermata di scelta oggetti iniziali.
+ * Chiamata da confirmPESpending (in Sezione 3).
  */
 function setupInitialItemsUI() {
-    if (!peSpendingOptionsEl || !initialItemsOptionsEl || !chapterTitleEl || !initItemsSelectionEl || !startGameButton || typeof handleInitialItemChange !== 'function' || typeof updateInitialItemLabels !== 'function' || typeof getString !== 'function') { console.error("Errore UI Oggetti o funzioni mancanti!"); return; }
-    peSpendingOptionsEl.classList.add('hidden');
-    initialItemsOptionsEl.classList.remove('hidden');
-    // if(initOptionsEl) initOptionsEl.classList.remove('hidden');
+    // Verifica esistenza elementi e funzioni necessarie
+    if (!peSpendingOptionsEl || !initialItemsOptionsEl || !chapterTitleEl || !initItemsSelectionEl || !startGameButton || typeof handleInitialItemChange !== 'function' || typeof updateInitialItemLabels !== 'function' || typeof getString !== 'function') { console.error("Errore: Elementi UI o funzioni mancanti per setupInitialItemsUI!"); return; }
 
-    chapterTitleEl.textContent = getString('configTitleItems');
+    peSpendingOptionsEl.classList.add('hidden'); // Nasconde sezione PE
+    initialItemsOptionsEl.classList.remove('hidden'); // Mostra sezione Oggetti
+    // if(initOptionsEl) initOptionsEl.classList.remove('hidden'); // Non serve se initialItemsOptionsEl è il container principale
 
+    chapterTitleEl.textContent = getString('configTitleItems'); // Imposta titolo
+
+    // Resetta Checkbox Oggetti
     if(initItemsSelectionEl) {
          initItemsSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.disabled = false; });
-          handleInitialItemChange(); // Aggiorna stato bottone Start
+          handleInitialItemChange(); // Aggiorna stato bottone Start (definita sotto)
     }
-     updateInitialItemLabels(); // Assicura label tradotte
+     updateInitialItemLabels(); // Assicura che le label siano tradotte (definita sotto)
+     // L'handler per startGameButton è associato in Sezione 4 (main)
 }
 
 
 /**
  * Aggiorna la UI durante la spesa dei PE (valori temp, PE rimasti, stato bottoni).
+ * Legge dalle variabili globali tempStats e peSpent (definite in Sezione 1).
  */
 function updatePESpendingUI() {
-    if (!peRemainingEl || !confirmPEButton || typeof initialGameState === 'undefined' || !initialGameState.stats || typeof peSpent === 'undefined' || typeof tempStats === 'undefined') { return; }
+    // Verifica esistenza elementi e stato prima di aggiornare
+    if (!peRemainingEl || !confirmPEButton || typeof initialGameState === 'undefined' || !initialGameState.stats || typeof peSpent === 'undefined' || typeof tempStats === 'undefined') { console.warn("Impossibile aggiornare UI PE: elementi o stato mancanti."); return; }
+
     const peLeft = initialGameState.stats.puntiEsperienza - peSpent.total;
     peRemainingEl.textContent = peLeft;
-    for (const statKey in tempStats) { if (!tempStats.hasOwnProperty(statKey) || tempStats[statKey] === undefined) continue; const statEl = document.getElementById(`temp-stat-${statKey}`); if (statEl) statEl.textContent = tempStats[statKey]; const peSpentEl = document.getElementById(`pe-spent-${statKey}`); if (peSpentEl) peSpentEl.textContent = peSpent[statKey] !== undefined ? peSpent[statKey] : 0; }
-    const peSpentLangEl = document.getElementById('pe-spent-lingua'); if(peSpentLangEl) peSpentLangEl.textContent = peSpent.lingua !== undefined ? peSpent.lingua : 0;
+
+    // Aggiorna visualizzazione stats temp e PE spesi per stat
+    for (const statKey in tempStats) {
+        if (!tempStats.hasOwnProperty(statKey) || tempStats[statKey] === undefined) continue;
+        const statEl = document.getElementById(`temp-stat-${statKey}`);
+        if (statEl) statEl.textContent = tempStats[statKey];
+        const peSpentEl = document.getElementById(`pe-spent-${statKey}`);
+        if (peSpentEl) peSpentEl.textContent = peSpent[statKey] !== undefined ? peSpent[statKey] : 0;
+    }
+    const peSpentLangEl = document.getElementById('pe-spent-lingua');
+    if(peSpentLangEl) peSpentLangEl.textContent = peSpent.lingua !== undefined ? peSpent.lingua : 0;
+
+
+    // Abilita/Disabilita Bottoni +/- Stats
     const baseStats = initialGameState.stats;
-    document.querySelectorAll('.pe-stat-row').forEach(row => { const plusButton = row.querySelector('.pe-btn-plus'); const minusButton = row.querySelector('.pe-btn-minus'); if(!plusButton || !minusButton) return; const statKey = plusButton.dataset.stat; if (!statKey || !tempStats.hasOwnProperty(statKey) || peSpent[statKey] === undefined) return; const currentValue = tempStats[statKey]; const currentPeSpentOnThis = peSpent[statKey] || 0; const maxPESpentOnStat = 1; const canAffordMorePE = peLeft > 0; let canIncrement = canAffordMorePE && currentPeSpentOnThis < maxPESpentOnStat; if (statKey === 'resistenza' && currentValue >= baseStats.resistenza + 3) canIncrement = false; if (statKey !== 'resistenza' && currentValue >= baseStats[statKey] + 1) canIncrement = false; plusButton.disabled = !canIncrement; minusButton.disabled = currentPeSpentOnThis <= 0; });
+    document.querySelectorAll('.pe-stat-row').forEach(row => {
+        const plusButton = row.querySelector('.pe-btn-plus');
+        const minusButton = row.querySelector('.pe-btn-minus');
+        if(!plusButton || !minusButton) return;
+        const statKey = plusButton.dataset.stat;
+        if (!statKey || !tempStats.hasOwnProperty(statKey) || peSpent[statKey] === undefined) return;
+
+        const currentValue = tempStats[statKey];
+        const currentPeSpentOnThis = peSpent[statKey] || 0;
+        const maxPESpentOnStat = 1;
+        const canAffordMorePE = peLeft > 0;
+
+        // Logica abilitazione '+'
+        let canIncrement = canAffordMorePE && currentPeSpentOnThis < maxPESpentOnStat;
+        if (statKey === 'resistenza' && currentValue >= baseStats.resistenza + 3) canIncrement = false;
+        if (statKey !== 'resistenza' && currentValue >= baseStats[statKey] + 1) canIncrement = false;
+        plusButton.disabled = !canIncrement;
+
+        // Logica abilitazione '-'
+        minusButton.disabled = currentPeSpentOnThis <= 0;
+    });
+
+     // Abilita/Disabilita Checkbox Lingue
      const canAffordLanguage = peLeft > 0;
-     if(peLanguageSelectionEl) { peLanguageSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.disabled = (peSpent.lingua >= 1 && !cb.checked) || (!canAffordLanguage && peSpent.lingua < 1); }); }
+     if(peLanguageSelectionEl) {
+        peLanguageSelectionEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.disabled = (peSpent.lingua >= 1 && !cb.checked) || (!canAffordLanguage && peSpent.lingua < 1);
+        });
+     }
+    // Abilita Conferma PE
     confirmPEButton.disabled = peSpent.total !== initialGameState.stats.puntiEsperienza;
 }
 
 /**
  * Aggiorna la visualizzazione della scheda personaggio nel DOM.
+ * Legge i dati dalla variabile globale gameState (definita in Sezione 1).
  */
 function updateCharacterSheetUI() {
+    // Usa valori di default se gameState o elementi non sono pronti
     const stats = gameState && gameState.stats ? gameState.stats : { combattivita: 0, resistenza: 0, resistenzaMax: 0, mira: 0, movimento: 0, sotterfugio: 0, scassinare: 0, percezione: 0, conoscenzaArcana: 0 };
     const inventory = gameState && gameState.inventory ? gameState.inventory : { armi: [], indossati: [], zaino: [], hasZaino: false };
     const languages = gameState && gameState.lingue ? gameState.lingue : [];
     const gold = gameState && gameState.moneteOro !== undefined ? gameState.moneteOro : 0;
     const keywords = gameState && gameState.keywords ? gameState.keywords : { attuali: [], permanenti: [] };
 
-    // Aggiorna elementi DOM (con controlli esistenza)
-    if (statCombattivita) statCombattivita.textContent = stats.combattivita;
-    if (statResistenza) statResistenza.textContent = Math.max(0, stats.resistenza);
-    if (statResistenzaMax) statResistenzaMax.textContent = stats.resistenzaMax;
-    if (statMira) statMira.textContent = stats.mira;
-    if (statMovimento) statMovimento.textContent = stats.movimento;
-    if (statSotterfugio) statSotterfugio.textContent = stats.sotterfugio;
-    if (statScassinare) statScassinare.textContent = stats.scassinare;
-    if (statPercezione) statPercezione.textContent = stats.percezione;
-    if (statConoscenzaArcana) statConoscenzaArcana.textContent = stats.conoscenzaArcana;
-    if (lingueList) lingueList.innerHTML = languages.map(l => `<li>${l}</li>`).join('');
-    if (moneteOro) moneteOro.textContent = gold;
-    if (hasZaino) hasZaino.checked = inventory.hasZaino;
-    if (zainoCount) zainoCount.textContent = inventory.zaino ? inventory.zaino.length : 0;
-    if (armiList) armiList.innerHTML = inventory.armi.map(i => `<li>${i.split('/')[0]}</li>`).join('');
-    if (indossatiList) indossatiList.innerHTML = inventory.indossati.map(i => `<li>${i.split('/')[0]}</li>`).join('');
-    if (zainoList) zainoList.innerHTML = inventory.zaino.map(i => `<li>${i.split('/')[0]}</li>`).join('');
-    if (keywordsAttualiList) keywordsAttualiList.innerHTML = keywords.attuali.map(k => `<li>${k}</li>`).join('');
-    if (keywordsPermanentiList) keywordsPermanentiList.innerHTML = keywords.permanenti.map(k => `<li>${k}</li>`).join('');
+    // Aggiorna elementi DOM (con controlli di esistenza per robustezza)
+    if (statCombattivita) statCombattivita.textContent = stats.combattivita; else console.warn("UI Warn: #stat-combattivita non trovato");
+    if (statResistenza) statResistenza.textContent = Math.max(0, stats.resistenza); else console.warn("UI Warn: #stat-resistenza non trovato");
+    if (statResistenzaMax) statResistenzaMax.textContent = stats.resistenzaMax; else console.warn("UI Warn: #stat-resistenza-max non trovato");
+    if (statMira) statMira.textContent = stats.mira; else console.warn("UI Warn: #stat-mira non trovato");
+    if (statMovimento) statMovimento.textContent = stats.movimento; else console.warn("UI Warn: #stat-movimento non trovato");
+    if (statSotterfugio) statSotterfugio.textContent = stats.sotterfugio; else console.warn("UI Warn: #stat-sotterfugio non trovato");
+    if (statScassinare) statScassinare.textContent = stats.scassinare; else console.warn("UI Warn: #stat-scassinare non trovato");
+    if (statPercezione) statPercezione.textContent = stats.percezione; else console.warn("UI Warn: #stat-percezione non trovato");
+    if (statConoscenzaArcana) statConoscenzaArcana.textContent = stats.conoscenzaArcana; else console.warn("UI Warn: #stat-conoscenza-arcana non trovato");
 
-     if(characterSheetEl) characterSheetEl.setAttribute('aria-live', 'off');
-     setTimeout(() => { if(characterSheetEl) characterSheetEl.setAttribute('aria-live', 'polite'); }, 50);
+    if (lingueList) lingueList.innerHTML = languages.map(l => `<li>${l}</li>`).join(''); else console.warn("UI Warn: #lingue-list non trovato");
+    if (moneteOro) moneteOro.textContent = gold; else console.warn("UI Warn: #monete-oro non trovato");
+
+    if (hasZaino) hasZaino.checked = inventory.hasZaino; else console.warn("UI Warn: #has-zaino non trovato");
+    if (zainoCount) zainoCount.textContent = inventory.zaino ? inventory.zaino.length : 0; else console.warn("UI Warn: #zaino-count non trovato");
+    // Mostra nomi puliti nell'inventario
+    if (armiList) armiList.innerHTML = inventory.armi.map(i => `<li>${i.split('/')[0]}</li>`).join(''); else console.warn("UI Warn: #armi-list non trovato");
+    if (indossatiList) indossatiList.innerHTML = inventory.indossati.map(i => `<li>${i.split('/')[0]}</li>`).join(''); else console.warn("UI Warn: #indossati-list non trovato");
+    if (zainoList) zainoList.innerHTML = inventory.zaino.map(i => `<li>${i.split('/')[0]}</li>`).join(''); else console.warn("UI Warn: #zaino-list non trovato");
+
+    if (keywordsAttualiList) keywordsAttualiList.innerHTML = keywords.attuali.map(k => `<li>${k}</li>`).join(''); else console.warn("UI Warn: #keywords-attuali-list non trovato");
+    if (keywordsPermanentiList) keywordsPermanentiList.innerHTML = keywords.permanenti.map(k => `<li>${k}</li>`).join(''); else console.warn("UI Warn: #keywords-permanenti-list non trovato");
+
+    // Forza aggiornamento ARIA
+     if(characterSheetEl) characterSheetEl.setAttribute('aria-live', 'off'); // Temporaneamente off
+     setTimeout(() => { if(characterSheetEl) characterSheetEl.setAttribute('aria-live', 'polite'); }, 50); // Riattiva
 }
 
 // --- Fine Sezione 2 (UI) ---
@@ -457,22 +536,21 @@ console.log("script.js: Sezione 2 (UI) definita.");
  */
 function displayChapter(chapterId) {
     // Verifica esistenza stato, dati e funzioni UI base
-    if (gameState.gameOver) { console.log("Game is over, cannot display chapter."); return; }
-    // Assicurati che le dipendenze siano pronte
-    if (typeof gameState === 'undefined' || typeof gameData === 'undefined' || typeof chapterTextEl === 'undefined' || typeof actionsEl === 'undefined' || typeof updateCharacterSheetUI !== 'function' || typeof getString !== 'function') { console.error("Errore critico: Stato, dati o funzioni UI base mancanti in displayChapter!"); return; }
+    if (gameState.gameOver) { console.log("Game is over."); return; }
+    if (typeof gameState === 'undefined' || typeof gameData === 'undefined' || typeof chapterTextEl === 'undefined' || typeof actionsEl === 'undefined' || typeof updateCharacterSheetUI !== 'function' || typeof getString !== 'function') { console.error("Errore critico: Stato, dati o elementi/funzioni UI base mancanti in displayChapter!"); return; }
     if (!gameData[chapterId]) { console.error(`Capitolo ${chapterId} non trovato in gameData!`); chapterTextEl.innerHTML = getString('errorChapterNotFound', { chapterId: chapterId }); actionsEl.innerHTML = ''; return; }
     if (!gameState.stats && chapterId !== 0) { console.log("Stato non inizializzato, reindirizzo all'inizio."); if(typeof displayInitialStateUI === 'function') displayInitialStateUI(); else console.error("displayInitialStateUI non def!"); return; }
 
     gameState.chapter = chapterId;
-    const chapter = gameData[chapterId];
+    const chapter = gameData[chapterId]; // Accede ai dati del capitolo specifico
     console.log(`--- Caricamento Capitolo ${chapterId} ('${chapter.title || ''}') ---`);
 
     // Reset UI elements (chiama funzioni UI)
-    actionsEl.innerHTML = '';
+    if(actionsEl) actionsEl.innerHTML = '';
     if(combatInfoEl) combatInfoEl.classList.add('hidden');
     if(diceRollEl) diceRollEl.classList.add('hidden');
     if(imageContainer) imageContainer.classList.add('hidden');
-    // Resetta stati interni del motore per il nuovo capitolo
+    // Resetta stati interni del motore
     gameState.combat = null;
     gameState.skillCheck = null;
     combatLog = []; // Resetta log testuale
@@ -485,7 +563,7 @@ function displayChapter(chapterId) {
      }
 
     // Applicare Effetti PRIMA di mostrare testo/scelte
-    if (chapter.effects && Array.isArray(chapter.effects)) { chapter.effects.forEach(applyEffect); }
+    if (chapter.effects && Array.isArray(chapter.effects)) { chapter.effects.forEach(applyEffect); } // applyEffect definito sotto
 
     // Impostare Immagine
     if (chapter.images && Array.isArray(chapter.images) && chapter.images.length > 0 && imageContainer && imageEl) {
@@ -495,33 +573,40 @@ function displayChapter(chapterId) {
     }
 
     // Impostare Testo e Titolo
-    chapterTextEl.innerHTML = chapter.text ? chapter.text.replace(/\n/g, '<br>') : '';
-    chapterTitleEl.textContent = chapterId === 0 ? "" : chapter.title || `${getString('chapterLabel')} ${chapterId}`;
+    if(chapterTextEl) chapterTextEl.innerHTML = chapter.text ? chapter.text.replace(/\n/g, '<br>') : '';
+    if(chapterTitleEl) chapterTitleEl.textContent = chapterId === 0 ? "" : chapter.title || `${getString('chapterLabel')} ${chapterId}`;
 
     // Impostare Combattimento o Skill Check
     if (chapter.combat && !gameState.skillCheck) {
-         // Deep copy per evitare modifiche all'originale in gameData
-         gameState.combat = JSON.parse(JSON.stringify(chapter.combat));
-         if(gameState.combat.enemies && Array.isArray(gameState.combat.enemies)) {
-             gameState.combat.enemies.forEach(e => { if(e.initialR === undefined) e.initialR = e.R; }); // Assicura initialR
-         } else { gameState.combat.enemies = []; } // Inizializza se manca
-         gameState.combat.turn = 'player'; // Il giocatore inizia sempre?
-         if(typeof updateCombatUI === 'function') updateCombatUI(); else console.error("updateCombatUI non definita!");
+         gameState.combat = JSON.parse(JSON.stringify(chapter.combat)); // Deep copy
+         if(gameState.combat.enemies && Array.isArray(gameState.combat.enemies)) { gameState.combat.enemies.forEach(e => { if(e.initialR === undefined) e.initialR = e.R; }); } else { gameState.combat.enemies = []; }
+         gameState.combat.turn = 'player';
+         if(typeof updateCombatUI === 'function') updateCombatUI(); else console.error("updateCombatUI non definita!"); // Da ui.js
     } else if (chapter.skillCheck && !gameState.combat) {
          gameState.skillCheck = { ...chapter.skillCheck }; // Copia oggetto
-         if(typeof updateSkillCheckUI === 'function') updateSkillCheckUI(gameState.skillCheck); else console.error("updateSkillCheckUI non definita!");
+         if(typeof updateSkillCheckUI === 'function') updateSkillCheckUI(gameState.skillCheck); else console.error("updateSkillCheckUI non definita!"); // Da ui.js
     } else { // Nasconde UI specifiche se non attive
          if(combatInfoEl) combatInfoEl.classList.add('hidden');
          if(diceRollEl) diceRollEl.classList.add('hidden');
      }
 
-    // Render Buttons (se non in combat/skill check)
-    if (!gameState.combat && !gameState.skillCheck && chapterId !== 0) {
+    // Render Buttons
+    if (actionsEl && !gameState.combat && !gameState.skillCheck && chapterId !== 0) {
         actionsEl.innerHTML = ''; // Assicura sia pulito
         let itemsOffered = [];
         // Cerca oggetti offerti esplicitamente (da compile_chapters)
         if (chapter.itemsOffered && Array.isArray(chapter.itemsOffered)) { itemsOffered = chapter.itemsOffered; }
-        else { /* Fallback cerca "Puoi prendere" - Omesso per brevità, ma la logica era nella risposta precedente se serve */ }
+        else { /* Fallback cerca "Puoi prendere" se necessario */
+            const getItemRegex = /Puoi prendere (?:l[ae'] |gli |i |un[' ]|quest[aoei] )?([\w\s\/]+(?: \([\w\s]+\))?)(?: se lo desideri)?\./gi;
+            let match; let tempTextForParsing = chapter.text || '';
+            while ((match = getItemRegex.exec(tempTextForParsing)) !== null) {
+                 const cleanItemName = match[1].trim();
+                 let itemType = "Generico"; // Euristica
+                 if (cleanItemName.toLowerCase().includes("/arma")) itemType = "Arma";
+                 else if (cleanItemName.toLowerCase().includes("/armatura") || cleanItemName.toLowerCase().includes("/scudo")) itemType = "Indossato";
+                 itemsOffered.push({ name: cleanItemName, type: itemType });
+             }
+        }
 
         // Crea bottoni Oggetti Offerti
         itemsOffered.forEach(item => {
@@ -536,18 +621,29 @@ function displayChapter(chapterId) {
                 else if (item.type === 'Indossato') { /* TODO: subtype */ canTake = true; }
             }
             button.disabled = !canTake; if(!canTake) button.textContent = getString('buttonTakeItemCant', { itemName: getString('item_' + itemKey) || cleanItemName });
-            button.addEventListener('click', (event) => { if (addItem(item.name, item.type)) { event.target.disabled = true; event.target.textContent = getString('buttonTakeItemTaken', { itemName: getString('item_' + itemKey) || cleanItemName }); saveGame(); } });
+            // Aggiunge listener che chiama addItem (da state.js)
+            button.addEventListener('click', (event) => {
+                if (addItem(item.name, item.type)) {
+                    event.target.disabled = true;
+                    event.target.textContent = getString('buttonTakeItemTaken', { itemName: getString('item_' + itemKey) || cleanItemName });
+                    saveGame(); // Salva dopo aver preso oggetto
+                }
+            });
             actionsEl.appendChild(button);
         });
 
         // Crea Bottoni Scelte Navigazione
         if(chapter.choices && Array.isArray(chapter.choices)) {
             chapter.choices.forEach(choice => {
-                let shouldDisplay = !choice.condition || checkCondition(choice.condition); // Usa checkCondition
+                let shouldDisplay = !choice.condition || checkCondition(choice.condition); // Usa checkCondition da questo file
                 if (shouldDisplay) {
                     const button = document.createElement('button');
                     button.textContent = choice.text.includes(getString('chapterLabel')) ? choice.text : `${choice.text} (${getString('chapterLabel')} ${choice.target})`;
-                    button.addEventListener('click', () => { displayChapter(choice.target); saveGame(); });
+                    // Aggiunge listener che chiama displayChapter (da questo file)
+                    button.addEventListener('click', () => {
+                         displayChapter(choice.target); // Chiama ricorsivamente
+                         if(typeof saveGame === 'function') saveGame(); else console.error("saveGame non definita!"); // Salva dopo la scelta
+                    });
                     actionsEl.appendChild(button);
                 }
             });
@@ -562,7 +658,7 @@ function displayChapter(chapterId) {
     } else if (chapterId !== 0 && !isEndChapter && !gameState.gameOver) { if(globalActionsContainer) globalActionsContainer.querySelectorAll('button').forEach(b => b.disabled = false); }
 
     // Check Morte (dopo aver applicato effetti)
-    if (gameState.stats && gameState.stats.resistenza <= 0 && !gameState.combat && !gameState.gameOver) { handleGameOver('infoGameOverDesc'); } // Chiama da questo file
+    if (gameState.stats && gameState.stats.resistenza <= 0 && !gameState.combat && !gameState.gameOver) { handleGameOver('infoGameOverDesc'); } // Chiama handleGameOver da questo file
 
     if(typeof updateCharacterSheetUI === 'function') updateCharacterSheetUI(); else console.error("updateCharacterSheetUI non def!");
 
@@ -600,25 +696,25 @@ function applyEffect(effect) {
             case 'ITEM_ADD':
                  const itemTypeAdd = detailValue1; const itemNameAdd = detailValue2;
                  if(itemTypeAdd && itemNameAdd && typeof addItem === 'function') addItem(itemNameAdd, itemTypeAdd); // Chiama da state.js
-                 else { console.warn("Invalid ITEM_ADD details or addItem function missing:", effect.details); }
+                 else { console.warn("Invalid ITEM_ADD details or addItem missing:", effect.details); }
                  break;
             case 'ITEM_REMOVE':
                  const itemNameToRemove = detailValue1;
                  if(itemNameToRemove && typeof removeItem === 'function') removeItem(itemNameToRemove); // Chiama da state.js
-                 else { console.warn("Invalid ITEM_REMOVE details or removeItem function missing:", effect.details); }
+                 else { console.warn("Invalid ITEM_REMOVE details or removeItem missing:", effect.details); }
                  break;
-            case 'COMBAT_MOD':
-                 if(detailValue1 === 'PARTNER_DAMAGE_DOUBLE' && detailValue2 === 'true') { console.log("Attivato mod: danno doppio"); if(gameState.combat) gameState.combat.doublePlayerDamage = true; else console.warn("COMBAT_MOD fuori da combat"); }
-                 break;
-            default: console.warn(`Unknown effect type: ${effect.type}`);
+              case 'COMBAT_MOD': // Esempio effetto speciale
+                  if(detailValue1 === 'PARTNER_DAMAGE_DOUBLE' && detailValue2 === 'true') { console.log("Attivato mod: danno doppio"); if(gameState.combat) gameState.combat.doublePlayerDamage = true; else console.warn("COMBAT_MOD fuori da combat"); }
+                  break;
+             default: console.warn(`Unknown effect type: ${effect.type}`);
         }
     } catch (e) { console.error("Error applying effect:", effect, e); }
-    // UI Update avviene alla fine di displayChapter
+    // L'aggiornamento UI avviene alla fine di displayChapter
 }
 
 // --- Funzione Controllo Condizioni (DA COMPLETARE CON TUTTE LE CONDIZIONI) ---
 function checkCondition(conditionText) {
-     if (!gameState || !gameState.inventory || !conditionText) return true; // Assumi true se stato non pronto
+     if (!gameState || !gameState.inventory || !conditionText) return true; // Assumi true se stato non pronto o condizione vuota
      const lowerCond = conditionText.toLowerCase().trim();
 
      // Check Oggetto
@@ -663,7 +759,7 @@ function checkCondition(conditionText) {
              else if ((operator === '==' || operator === '=') && currentStatValue === valueCheck) result = true;
              else if (operator === '!=' && currentStatValue !== valueCheck) result = true;
              console.log(`Check Cond: "${conditionText}" -> Val: ${currentStatValue}, Res: ${result}`); return result;
-         } else { console.warn(`Statistica non valida o valore non numerico in checkCondition: ${conditionText}`); return false; } // Stat non valida -> Falso
+         } else { console.warn(`Statistica non valida o valore non numerico in checkCondition: ${conditionText}`); return false; }
      }
 
      // --- AGGIUNGI ALTRI CHECK QUI (MONETE, ECC.) ---
@@ -691,25 +787,23 @@ function resolveSkillCheck() {
 
 // --- Funzioni Combattimento ---
 function handleCombatActionAttack() {
-     if (!gameState.combat || gameState.combat.turn !== 'player' || gameState.gameOver || typeof gameState.stats === 'undefined') return; // Check stato valido
-     // Verifica funzioni necessarie
+     if (!gameState.combat || gameState.combat.turn !== 'player' || gameState.gameOver || !gameState.stats) return;
      if(typeof finalizeCombat !== 'function' || typeof addLogToCombat !== 'function' || typeof updateCombatUI !== 'function' || typeof updateCharacterSheetUI !== 'function') { console.error("handleCombatActionAttack: Funzioni dipendenti mancanti!"); return; }
 
      const activeEnemies = gameState.combat.enemies.filter(e => e.R > 0); if (activeEnemies.length === 0) { finalizeCombat(true); return; }
      const targetEnemy = activeEnemies[0]; const playerRoll1=Math.floor(Math.random()*6)+1, playerRoll2=Math.floor(Math.random()*6)+1, playerTotalRoll=playerRoll1+playerRoll2;
      let playerDamage = playerTotalRoll + gameState.stats.combattivita - targetEnemy.C;
-     if (gameState.combat.doublePlayerDamage) playerDamage *= 2; // Applica mod danno doppio
+     if (gameState.combat.doublePlayerDamage) playerDamage *= 2;
      if (playerTotalRoll === 2) { playerDamage = 0; addLogToCombat('logPlayerMiss',{targetName:targetEnemy.name,roll:playerTotalRoll},true); }
      else { if (playerTotalRoll === 12) playerDamage = Math.max(2, playerDamage); playerDamage = Math.max(0, playerDamage); targetEnemy.R -= playerDamage; addLogToCombat('logPlayerAttack',{targetName:targetEnemy.name,damage:playerDamage,roll:playerTotalRoll},true); }
      if (targetEnemy.R <= 0) addLogToCombat('logEnemyDefeated',{enemyName:targetEnemy.name},true);
-     updateCombatUI(); updateCharacterSheetUI(); // Aggiorna UI dopo attacco
-     if (gameState.combat.enemies.every(e => e.R <= 0)) { finalizeCombat(true); return; } // Check vittoria
-     gameState.combat.turn = 'enemy'; updateCombatUI(); setTimeout(handleEnemyCombatTurn, 1200); // Passa turno a nemico
+     updateCombatUI(); updateCharacterSheetUI();
+     if (gameState.combat.enemies.every(e => e.R <= 0)) { finalizeCombat(true); return; }
+     gameState.combat.turn = 'enemy'; updateCombatUI(); setTimeout(handleEnemyCombatTurn, 1200);
 }
 
 function handleEnemyCombatTurn() {
-     if (gameState.gameOver || !gameState.combat || gameState.combat.turn !== 'enemy' || typeof gameState.stats === 'undefined') return;
-     // Verifica funzioni necessarie
+     if (gameState.gameOver || !gameState.combat || gameState.combat.turn !== 'enemy' || !gameState.stats) return;
      if(typeof finalizeCombat !== 'function' || typeof addLogToCombat !== 'function' || typeof updateCombatUI !== 'function' || typeof updateCharacterSheetUI !== 'function' || typeof removeItem !== 'function') { console.error("handleEnemyCombatTurn: Funzioni dipendenti mancanti!"); return; }
 
      const activeEnemies = gameState.combat.enemies.filter(e => e.R > 0); let playerDefeated = false;
@@ -732,51 +826,44 @@ function handleEnemyCombatTurn() {
                 }
             } else { addLogToCombat('logEnemyNoDamage',{enemyName:enemy.name,roll:enemyTotalRoll},true); }
         }
-        updateCharacterSheetUI(); updateCombatUI(); // Aggiorna UI dopo ogni attacco nemico
+        updateCharacterSheetUI(); updateCombatUI();
      });
-     if (playerDefeated) { finalizeCombat(false); return; } // Check sconfitta DOPO che tutti hanno attaccato
-     gameState.combat.turn = 'player'; updateCombatUI(); // Passa turno a giocatore
+     if (playerDefeated) { finalizeCombat(false); return; }
+     gameState.combat.turn = 'player'; updateCombatUI();
 }
 
 function finalizeCombat(playerWon) {
-    // Verifica funzioni necessarie
+    // Verifica dipendenze
     if (typeof gameState === 'undefined' || typeof addLogToCombat !== 'function' || typeof displayChapter !== 'function' || typeof saveGame !== 'function' || typeof handleGameOver !== 'function') { console.error("finalizeCombat: Dipendenze mancanti!"); return;}
 
-    const victoryChapter = gameState.combat?.victoryChapter; // Leggi prima di resettare
+    const victoryChapter = gameState.combat?.victoryChapter;
     gameState.combat = null; // Pulisce stato combattimento
-
     if (playerWon) {
-        addLogToCombat('logVictory', {}, true);
+        addLogToCombat('logVictory', {}, true); // Aggiunge log vittoria
         console.log("Combattimento vinto!");
-        setTimeout(() => displayChapter(victoryChapter || gameState.chapter + 1), 1500); // Ritardo per leggere log finale
+        setTimeout(() => displayChapter(victoryChapter || gameState.chapter + 1), 1500); // Ritardo per leggere log
         saveGame();
     } else {
         console.log("Combattimento perso!");
-        // handleGameOver viene già chiamato da handleEnemyCombatTurn in caso di sconfitta
-        // Ma lo chiamiamo qui come fallback se playerDefeated non fosse gestito correttamente
-        handleGameOver('infoGameOverCombat');
+        handleGameOver('infoGameOverCombat'); // Chiama handleGameOver
     }
 }
 
 function addLogToCombat(messageKey, params = {}, scroll = false) {
-    // Verifica funzioni necessarie
     if(typeof getString !== 'function' || typeof addLogToUI !== 'function') { console.error("addLogToCombat: getString o addLogToUI non definite!"); return; }
-    const message = getString(messageKey, params);
-    console.log("COMBAT LOG:", message);
-    combatLog.push(message); // Aggiunge al log interno (variabile in state.js)
-    addLogToUI(message); // Chiama funzione UI per visualizzare
+    const message = getString(messageKey, params); console.log("COMBAT LOG:", message); combatLog.push(message); addLogToUI(message);
 }
 
 // --- Funzione Game Over (Logica + chiamata UI) ---
 function handleGameOver(reasonKey, params = {}) {
-    // Verifica funzioni necessarie
-    if (typeof gameState === 'undefined' || typeof showGameOverUI !== 'function' || typeof getString !== 'function' || typeof announceMessage !== 'function') { console.error("handleGameOver: Dipendenze mancanti!"); return;}
     if(gameState.gameOver) return; // Evita chiamate multiple
     gameState.gameOver = true; // Imposta flag
     console.log("Game Over:", reasonKey, params);
-    showGameOverUI(reasonKey, params); // Chiama da ui.js
+    // Chiama la funzione UI per mostrare l'overlay
+    if(typeof showGameOverUI === 'function') showGameOverUI(reasonKey, params); // Chiama da ui.js
+    else console.error("Funzione showGameOverUI non definita!");
+    // Disabilita bottoni Salva/Carica nel contenitore globale
     if(globalActionsContainer) globalActionsContainer.querySelectorAll('button:not(#new-game-button)').forEach(b => b.disabled = true);
-    announceMessage(getString('gameOverTitle') + ": " + (getString(reasonKey, params) || getString('infoGameOverReason')), 'assertive');
 }
 
 // --- Fine Sezione 3 (Engine) ---
@@ -792,21 +879,19 @@ console.log("script.js: Sezione 3 (Engine) definita.");
 
 /**
  * Mostra un messaggio all'utente tramite la regione ARIA live.
- * Funzione helper definita qui per centralizzare la logica.
  * @param {string} message - Il messaggio da mostrare.
  * @param {string} [politeness='polite'] - Livello ARIA live ('polite' o 'assertive').
  */
 function announceMessage(message, politeness = 'polite') {
     // Verifica che l'elemento esista (dovrebbe essere cachato da cacheDOMElements)
-    // Aggiungiamo un controllo per sicurezza
+    // Aggiungiamo un controllo per sicurezza, nel caso venga chiamata prima del caching
     const msgEl = typeof gameMessagesEl !== 'undefined' ? gameMessagesEl : document.getElementById('game-messages');
     if (msgEl) {
         msgEl.setAttribute('aria-live', politeness);
         msgEl.textContent = message; // Imposta il testo del messaggio
-        // Pulisce dopo un timeout per evitare letture multiple
+        // Pulisce dopo un timeout
         setTimeout(() => { if(msgEl) msgEl.textContent = ''; }, 3500);
     } else {
-        // Fallback se l'elemento non è pronto o definito
         console.warn("Elemento #game-messages non trovato per announceMessage.");
     }
     console.log(`Announce (${politeness}): ${message}`); // Log per debug
@@ -817,17 +902,17 @@ function announceMessage(message, politeness = 'polite') {
  * Chiamata quando l'utente clicca "Carica Partita".
  */
 function loadGameAndUpdateUI() {
-    // Verifica che le funzioni necessarie siano definite globalmente (dagli altri script)
+    // Verifica che le funzioni necessarie siano definite globalmente
+    // Queste funzioni dovrebbero essere state definite nelle sezioni precedenti di questo file
     if (typeof loadGame !== 'function' || typeof getString !== 'function' || typeof setLanguage !== 'function' || typeof displayInitialStateUI !== 'function' || typeof displayChapter !== 'function' || typeof updateCharacterSheetUI !== 'function' || typeof updateAllUIStrings !== 'function' ) {
          console.error("Errore CRITICO: Funzioni necessarie per loadGameAndUpdateUI non definite!");
-         // Usa alert come fallback se getString non è disponibile
          alert((typeof getString === 'function' ? getString('errorGeneric') : "Errore") || "Si è verificato un errore interno durante il caricamento.");
          return;
      }
 
-    if (loadGame()) { // loadGame (da state.js) ritorna true se caricato con successo
+    if (loadGame()) { // loadGame (da Sezione 1) ritorna true se caricato con successo
         announceMessage(getString('infoGameLoaded'), 'assertive'); // Notifica accessibile
-        setLanguage(currentLang); // Riapplica lingua corrente (che chiama displayChapter o InitialState)
+        setLanguage(currentLang); // Riapplica lingua corrente (da strings.js, chiama displayChapter/InitialState)
         // Assicura che i bottoni globali siano abilitati dopo un caricamento riuscito
         if(globalActionsContainer) globalActionsContainer.querySelectorAll('button').forEach(b => b.disabled = false);
     } else {
@@ -840,7 +925,7 @@ function loadGameAndUpdateUI() {
              announceMessage(getString('errorLoadFailed'), 'assertive');
              alert(getString('errorLoadFailed'));
         }
-        displayInitialStateUI(); // Mostra stato iniziale pulito
+        displayInitialStateUI(); // Mostra stato iniziale pulito (da Sezione 2)
     }
 }
 
@@ -857,9 +942,9 @@ function resetGameAndUpdateUI(confirmReset = true) {
          return;
      }
 
-    if (resetGame(confirmReset)) { // resetGame (da state.js) ritorna true se l'utente conferma
+    if (resetGame(confirmReset)) { // resetGame (da Sezione 1) ritorna true se l'utente conferma
         announceMessage(getString('infoNewGame'));
-        showInitScreen(); // Chiama funzione da questo file (ex ui.js) per mostrare config PE
+        showInitScreen(); // Chiama funzione da Sezione 2 per mostrare schermata config PE
     } else {
         console.log("Reset annullato dall'utente."); // Nessun messaggio UI se l'utente annulla
     }
@@ -873,8 +958,8 @@ function resetGameAndUpdateUI(confirmReset = true) {
 function initializeApp() {
     console.log("initializeApp: Inizio inizializzazione completa...");
 
-    // 1. Cache elementi DOM (definita in Sezione 2 - UI)
-    // Verifica che sia stata definita prima di chiamarla
+    // 1. Cache elementi DOM (definita in Sezione 2)
+    // Verifica esistenza funzione prima di chiamare
     if (typeof cacheDOMElements === 'function') {
         cacheDOMElements();
     } else {
@@ -883,107 +968,63 @@ function initializeApp() {
         return;
     }
 
-    // 2. Verifica dipendenze critiche (più dettagliata)
-    console.log("initializeApp: Verifica dipendenze dettagliata...");
-    const dependenciesToCheck = {
-        // Oggetti/Variabili
-        THREE: typeof THREE,
-        SimplexNoise: typeof SimplexNoise, // Da three_setup? No, globale da CDN
-        uiStrings: typeof uiStrings,         // da strings.js
-        gameData: typeof gameData,           // da gameData.js
-        initialGameState: typeof initialGameState, // da state (Sezione 1)
-        gameState: typeof gameState,         // da state (Sezione 1)
-        currentLang: typeof currentLang,     // da strings.js
+    // 2. Verifica dipendenze - Rimossa (ci affidiamo all'ordine e ai check al momento dell'uso)
+    console.log("initializeApp: Verifica dipendenze non eseguita (affidamento a 'defer').");
 
-        // Funzioni Chiave
-        getString: typeof getString,           // da strings.js
-        setLanguage: typeof setLanguage,       // da strings.js
-        initThree: typeof initThree,             // da three_setup
-        cacheDOMElements: typeof cacheDOMElements,   // da ui (Sezione 2)
-        updateAllUIStrings: typeof updateAllUIStrings, // da ui (Sezione 2)
-        displayInitialStateUI: typeof displayInitialStateUI, // da ui (Sezione 2)
-        showInitScreen: typeof showInitScreen,       // da ui (Sezione 2)
-        displayChapter: typeof displayChapter,     // da engine (Sezione 3)
-        saveGame: typeof saveGame,             // da state (Sezione 1)
-        loadGame: typeof loadGame,             // da state (Sezione 1)
-        resetGame: typeof resetGame,           // da state (Sezione 1)
-        addItem: typeof addItem,               // da state (Sezione 1)
-        removeItem: typeof removeItem,           // da state (Sezione 1)
-        updateCharacterSheetUI: typeof updateCharacterSheetUI, // da ui (Sezione 2)
-        updateCombatUI: typeof updateCombatUI,       // da ui (Sezione 2)
-        updateSkillCheckUI: typeof updateSkillCheckUI,   // da ui (Sezione 2)
-        applyEffect: typeof applyEffect,           // da engine (Sezione 3)
-        checkCondition: typeof checkCondition,       // da engine (Sezione 3)
-        resolveSkillCheck: typeof resolveSkillCheck,   // da engine (Sezione 3)
-        handleCombatActionAttack: typeof handleCombatActionAttack, // da engine (Sezione 3)
-        handleGameOver: typeof handleGameOver,       // da engine (Sezione 3)
-        changeStatPE: typeof changeStatPE,           // da engine (Sezione 3)
-        handleLanguageSelection: typeof handleLanguageSelection, // da engine (Sezione 3)
-        confirmPESpending: typeof confirmPESpending,   // da engine (Sezione 3)
-        startGame: typeof startGame,               // da engine (Sezione 3)
-        handleInitialItemChange: typeof handleInitialItemChange, // da ui (Sezione 2)
-        // Aggiungi altre funzioni se necessario
-    };
-
-    let missingDepsDetailed = [];
-    console.log("--- Risultati Verifica Dipendenze ---");
-    for (const depName in dependenciesToCheck) {
-        const type = dependenciesToCheck[depName];
-        console.log(`  - ${depName}: ${type}`);
-        if (type === 'undefined') {
-            missingDepsDetailed.push(depName);
-        }
-    }
-    console.log("------------------------------------");
-
-
-    if (missingDepsDetailed.length > 0) {
-         console.error("Errore CRITICO: Una o più dipendenze base mancanti o non definite!", missingDepsDetailed);
-         document.body.innerHTML = `<h1 style="color:red; text-align:center;">Errore Inizializzazione Critico (${missingDepsDetailed.join(', ')} mancante/i).</h1>`;
-         return; // Blocca esecuzione
-     }
-     console.log("initializeApp: Dipendenze base verificate con successo.");
-
-    // ... resto di initializeApp (chiamate a initThree, updateAllUIStrings, etc.) ...
-
-    // 3. Init Three.js (definita in Sezione Three.js - se la mettiamo qui)
-    // O assumiamo sia definita globalmente da three_setup.js
+    // 3. Init Three.js (definita in three_setup.js, ma deve essere nello scope globale o importata)
     console.log("initializeApp: Chiamo initThree...");
-    initThree(); // Deve essere definita prima di questa chiamata
-    console.log("initializeApp: initThree chiamata.");
+    // Verifica esistenza
+    if (typeof initThree === 'function') {
+        initThree();
+        console.log("initializeApp: initThree chiamata.");
+    } else {
+        console.error("initThree non definita (da three_setup.js?)");
+        // Considera se mostrare un fallback o un messaggio se la grafica 3D è essenziale/importante
+        const visualsDiv = document.getElementById('visuals');
+        if (visualsDiv) visualsDiv.innerHTML = "<p style='color:orange; text-align:center;'>Grafica 3D non caricata.</p>";
+    }
 
-    // 4. Init UI Strings (definita in Sezione UI)
+    // 4. Init UI Strings (definita in Sezione 2)
     console.log("initializeApp: Chiamo updateAllUIStrings...");
-    updateAllUIStrings();
-    console.log("initializeApp: updateAllUIStrings chiamata.");
+    if (typeof updateAllUIStrings === 'function') updateAllUIStrings(); else console.error("updateAllUIStrings non definita!");
+    console.log("initializeApp: updateAllUIStrings chiamata (se definita).");
 
-    // 5. Mostra stato iniziale UI (definita in Sezione UI)
+    // 5. Mostra stato iniziale UI (definita in Sezione 2)
     console.log("initializeApp: Chiamo displayInitialStateUI...");
-    displayInitialStateUI();
-    console.log("initializeApp: displayInitialStateUI chiamata.");
+    if (typeof displayInitialStateUI === 'function') displayInitialStateUI(); else console.error("displayInitialStateUI non definita!");
+    console.log("initializeApp: displayInitialStateUI chiamata (se definita).");
 
     // 6. Imposta lingua iniziale (definita in strings.js, resa globale)
     console.log("initializeApp: Imposto lingua iniziale...");
+    // Verifica esistenza uiStrings e setLanguage
     const browserLang = navigator.language.split('-')[0];
     const initialLang = (typeof uiStrings !== 'undefined' && uiStrings[browserLang]) ? browserLang : 'it';
-    setLanguage(initialLang); // setLanguage da strings.js
+    if (typeof setLanguage === 'function') setLanguage(initialLang); else console.error("setLanguage non definita!");
     if(langSelect) langSelect.value = currentLang; // currentLang da strings.js
-    console.log("initializeApp: Lingua impostata.");
+    console.log("initializeApp: Lingua impostata (se possibile).");
 
-    // --- 7. AGGIUNTA DEGLI EVENT LISTENER ---
+    // --- 7. AGGIUNTA DEGLI EVENT LISTENER AI CONTROLLI ---
     console.log("initializeApp: Aggiungo Event Listeners...");
 
     // Bottoni Globali
     const saveBtn = document.getElementById('save-button');
     const loadBtn = document.getElementById('load-button');
     const newGameBtn = document.getElementById('new-game-button');
-    // Verifica esistenza prima di aggiungere listener
-    if (saveBtn) saveBtn.addEventListener('click', () => { saveGame(); announceMessage(getString('infoGameSaved')); }); else console.warn("#save-button non trovato");
-    if (loadBtn) loadBtn.addEventListener('click', loadGameAndUpdateUI); else console.warn("#load-button non trovato");
-    if (newGameBtn) newGameBtn.addEventListener('click', () => resetGameAndUpdateUI(true)); else console.warn("#new-game-button non trovato");
+    // Verifica esistenza bottone E funzione prima di aggiungere listener
+    if (saveBtn && typeof saveGame === 'function') {
+        saveBtn.addEventListener('click', saveGame); // Rimosso announceMessage da qui
+    } else { console.warn("#save-button o funzione saveGame mancante."); }
+    if (loadBtn && typeof loadGameAndUpdateUI === 'function') {
+        loadBtn.addEventListener('click', loadGameAndUpdateUI);
+    } else { console.warn("#load-button o funzione loadGameAndUpdateUI mancante."); }
+    if (newGameBtn && typeof resetGameAndUpdateUI === 'function') {
+        newGameBtn.addEventListener('click', () => resetGameAndUpdateUI(true));
+    } else { console.warn("#new-game-button o funzione resetGameAndUpdateUI mancante."); }
 
     // Selettore Lingua
-    if (langSelect) langSelect.addEventListener('change', (event) => setLanguage(event.target.value)); else console.warn("#lang-select non trovato");
+    if (langSelect && typeof setLanguage === 'function') {
+        langSelect.addEventListener('change', (event) => setLanguage(event.target.value));
+    } else { console.warn("#lang-select o funzione setLanguage mancante."); }
 
     // Listener per Elementi Dinamici (Configurazione, Combattimento, Skill Check) - Delegation
     if (peSpendingOptionsEl) {
@@ -991,40 +1032,51 @@ function initializeApp() {
             const target = event.target;
             if (target.tagName === 'BUTTON' && (target.classList.contains('pe-btn-plus') || target.classList.contains('pe-btn-minus'))) {
                 const stat = target.dataset.stat; const change = parseInt(target.dataset.change);
-                if (stat && !isNaN(change)) changeStatPE(stat, change); // Da engine
-            } else if (target.id === 'confirm-pe-button') { confirmPESpending(); } // Da engine
+                if (stat && !isNaN(change) && typeof changeStatPE === 'function') changeStatPE(stat, change); // Da engine
+            } else if (target.id === 'confirm-pe-button') {
+                 if (typeof confirmPESpending === 'function') confirmPESpending(); // Da engine
+                 else console.error("Funzione confirmPESpending non definita!");
+            }
         });
     } else { console.warn("#pe-spending-options non trovato per delegation."); }
 
     if(peLanguageSelectionEl) {
         peLanguageSelectionEl.addEventListener('change', (event) => {
-             if (event.target.tagName === 'INPUT' && event.target.type === 'checkbox') handleLanguageSelection(event.target); // Da engine
+             if (event.target.tagName === 'INPUT' && event.target.type === 'checkbox' && typeof handleLanguageSelection === 'function') handleLanguageSelection(event.target); // Da engine
          });
     } else { console.warn("#pe-language-selection non trovato per delegation."); }
 
      if(initItemsSelectionEl) {
          initItemsSelectionEl.addEventListener('change', (event) => {
-             if (event.target.tagName === 'INPUT' && event.target.type === 'checkbox') handleInitialItemChange(); // Da ui
+             if (event.target.tagName === 'INPUT' && event.target.type === 'checkbox' && typeof handleInitialItemChange === 'function') handleInitialItemChange(); // Da ui
          });
      } else { console.warn("#initial-items-selection non trovato per delegation."); }
 
-     if (startGameButton) { startGameButton.addEventListener('click', startGame); } // Da engine
-     else { console.warn("#start-game-button non trovato.");}
+     if (startGameButton) {
+        if (typeof startGame === 'function') startGameButton.addEventListener('click', startGame); // Da engine
+        else console.error("Funzione startGame non definita per bottone!");
+     } else { console.warn("#start-game-button non trovato.");}
 
-     if (rollDiceButton) { rollDiceButton.addEventListener('click', resolveSkillCheck); } // Da engine
-     else { console.warn("#roll-dice-button non trovato."); }
+     if (rollDiceButton) {
+        if (typeof resolveSkillCheck === 'function') rollDiceButton.addEventListener('click', resolveSkillCheck); // Da engine
+        else console.error("Funzione resolveSkillCheck non definita per bottone!");
+     } else { console.warn("#roll-dice-button non trovato."); }
 
      // Listener per Azioni Combattimento (delegation su #actions)
      if (actionsEl) {
          actionsEl.addEventListener('click', (event) => {
              const target = event.target;
+             // Esegui solo se è un bottone DI COMBATTIMENTO, siamo in combattimento, ed è il turno del giocatore
              if (target.tagName === 'BUTTON' && gameState.combat && gameState.combat.turn === 'player') {
+                 // Identifica bottone attacco (usa ID o testo localizzato)
                  if (target.id === 'combat-attack-button' || target.textContent === getString('attackButtonLabel')) {
+                      // Verifica esistenza funzione prima di chiamare
                       if (typeof handleCombatActionAttack === 'function') handleCombatActionAttack(); else console.error("handleCombatActionAttack non definito!");
                  }
+                 // Gestione Fuga (se implementata)
                  // else if (target.id === 'combat-flee-button' || ...) { /* handleFlee(); */ }
              }
-             // I listener per i bottoni di scelta capitolo normale vengono aggiunti
+             // I listener per i bottoni di scelta capitolo normale sono aggiunti
              // direttamente ai bottoni creati in displayChapter (engine.js)
          });
      } else { console.warn("#actions non trovato per listener delegato."); }
@@ -1046,8 +1098,8 @@ if (document.readyState === 'loading') {
 // --- Event Listener Globale (Salvataggio su Chiusura) ---
 // Usa 'visibilitychange' e 'pagehide' per maggiore affidabilità
 document.addEventListener('visibilitychange', () => {
+    // Salva se la pagina diventa nascosta E il gioco è in uno stato valido
     if (document.visibilityState === 'hidden') {
-         // Salva solo se il gioco è in uno stato valido
          if (gameState && gameState.stats && gameState.chapter !== 0 && !gameState.gameOver && typeof saveGame === 'function') {
              saveGame();
              console.log("Salvataggio su visibilitychange (hidden).");
@@ -1056,7 +1108,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('pagehide', (event) => {
-    // Salva solo se il gioco è in uno stato valido
+    // Salva se il gioco è in uno stato valido prima che la pagina venga eventualmente scaricata
     if (gameState && gameState.stats && gameState.chapter !== 0 && !gameState.gameOver && typeof saveGame === 'function') {
         saveGame(); // Funzione da state.js
         console.log("Salvataggio su pagehide.");
@@ -1064,4 +1116,4 @@ window.addEventListener('pagehide', (event) => {
 });
 
 // --- Fine script.js ---
-console.log("script.js: Script analizzato.");
+console.log("script.js: Script analizzato e inizializzazione avviata/completata.");
